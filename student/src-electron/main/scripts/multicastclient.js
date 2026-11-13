@@ -65,8 +65,6 @@ class MulticastClient {
             localLockdown: false,
             group: 'a',
             submissionnumber: 0,
-            localVMHost: null,
-            localVMState: null,
             version: config.version
         }
     }

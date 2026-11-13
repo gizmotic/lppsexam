@@ -36,55 +36,6 @@
     <!-- Header END -->
 
     <div v-show="!isLoading" id="wrapper" class="w-100 h-100 d-flex">
-        <!-- LocalVM preflight overlay (must stay in student.vue; exam window opens only after checks pass) -->
-        <div v-if="showLocalVmPreflightOverlay" class="localvm-preflight-backdrop">
-            <div class="localvm-preflight-card">
-                <div class="localvm-preflight-title">LocalVM</div>
-
-                <div v-if="localVmIsVerifying" class="localvm-preflight-verify">
-                    <div class="localvm-preflight-spinner" aria-hidden="true"></div>
-                    <div class="localvm-preflight-text">{{ localVmVerifyingText }}</div>
-                    <div class="localvm-preflight-subtext">{{ $t('student.vmVerifyingHashHint') }}</div>
-                </div>
-
-                <div v-else-if="localVmFixPhase === 'waiting_for_start'" class="localvm-preflight-text">
-                    {{ $t('student.localvmFixWaitingForStart') }}
-                </div>
-
-                <div v-else-if="localVmIsMissing" class="localvm-preflight-text">
-                    {{ $t('student.localvmMissingDisk') }}
-                </div>
-
-                <div v-else-if="localVmIsMismatch" class="localvm-preflight-text">
-                    {{ $t('student.localvmDiskMismatch') }}
-                </div>
-
-                <div v-else class="localvm-preflight-text">
-                    {{ $t('student.localvmStartError') }}
-                </div>
-
-                <div class="localvm-preflight-actions">
-                    <button v-if="localVmCanRetryStart && !localVmFixPhase" class="btn btn-success btn-sm" @click="retryLocalVmStart" :disabled="localVmBusy">
-                        {{ $t('student.localvmRetryStartButton') }}
-                    </button>
-                    <button v-if="localVmCanFix && !localVmFixPhase" class="btn btn-primary btn-sm" @click="downloadVm" :disabled="localVmBusy">
-                        {{ $t('student.localvmDownloadButton') }}
-                    </button>
-                    <button v-if="localVmCanFix && !localVmFixPhase" class="btn btn-cyan btn-sm" @click="browseVm" :disabled="localVmBusy">
-                        {{ $t('student.localvmBrowseButton') }}
-                    </button>
-                </div>
-
-                <div v-if="localVmFixPhase && localVmCanFix && !localVmIsVerifying" class="localvm-preflight-verify" style="margin-top: 12px;">
-                    <div class="localvm-preflight-spinner" aria-hidden="true"></div>
-                    <div class="localvm-preflight-text">
-                        {{ localVmFixPhase === 'waiting_for_start' ? $t('student.localvmWaitingForStart') : (localVmFixPhase === 'importing' ? $t('student.localvmImporting') : $t('student.localvmDownloading')) }}
-                    </div>
-                    <div v-if="localVmFixPhase !== 'waiting_for_start' && localVmDownloadPercent != null" class="localvm-preflight-subtext">{{ localVmDownloadPercent }}%</div>
-                </div>
-            </div>
-        </div>
-
         <!-- SIDEBAR START -->
         <div class="p-3 text-white bg-dark h-100 student-sidebar" style="width: 240px; min-width: 240px;">
             <div class="btn btn-light ms-1 text-start infobutton nobutton">
@@ -321,7 +272,6 @@ import { autoCleanupMixin } from "../mixins/autoCleanupMixin.ts";
 import { mergeDiscoveredExams } from "../utils/examDiscovery.ts";
 import { useConfigStore } from "stores/configStore.ts";
 import { ref } from 'vue';
-import { showLocalVmQemuIssueDialog } from 'next-exam-shared/qemuLocalVmDialogs.js'
 import loggingBridge from "../utils/loggingBridge.js";
 import { StatusBar } from "@capacitor/status-bar";
 import {Directory, Filesystem} from "@capacitor/filesystem";
@@ -390,10 +340,6 @@ export default {
             validip: true,
             serverFailureCount: {}, // Track failed ping attempts for manually added servers
             activeDialog: false,
-            localVmBusy: false,
-            localVmDownloadPercent: null,
-            localVmFixPhase: null,
-            localVmCompatCheckSwalOpen: false,
             exitQuestionSwalOpen: false,
 
         };
@@ -409,30 +355,6 @@ export default {
             return !this.token && this.hostip?.availableInterfaces?.length > 1;
         },
 
-        showLocalVmPreflightOverlay() {
-            const st = this.clientinfo?.localVMState;
-            const inPreflightState = st === 'missing' || st === 'hash_mismatch' || st === 'verifying_hash' || st === 'error';
-            return !!this.token && !this.clientinfo?.exammode && this.clientinfo?.examtype === 'localvm' && inPreflightState;
-        },
-        localVmIsMissing() {
-            return this.clientinfo?.localVMState === 'missing';
-        },
-        localVmIsMismatch() {
-            return this.clientinfo?.localVMState === 'hash_mismatch';
-        },
-        localVmIsVerifying() {
-            return this.clientinfo?.localVMState === 'verifying_hash';
-        },
-        localVmCanFix() {
-            return this.localVmIsMissing || this.localVmIsMismatch || this.clientinfo?.localVMState === 'error';
-        },
-        localVmCanRetryStart() {
-            return this.clientinfo?.localVMState === 'error' && !!this.serverstatus?.exammode;
-        },
-        localVmVerifyingText() {
-            const cfg = this.getLocalVmConfig?.() || {};
-            return cfg.calculateSha256 === true ? this.$t('student.vmVerifyingHash') : this.$t('student.vmVerifyingSize');
-        },
         showCageKioskInstallBtn() {
             const k = this.platformKiosk;
             return isElectronWindow() && k.displayServer !== 'n/a' && k.displayServer !== 'windows' && !k.runningInCage && k.needsCageKioskSetup;
@@ -441,22 +363,6 @@ export default {
             return 'cageSetup';
         },
     },
-    watch: {
-        'clientinfo.localVMState'(nextState) {
-            const st = String(nextState || '');
-            if (st !== 'checking_compat') {
-                this.closeLocalVmCompatCheckDialog();
-            }
-            const inPreflightState = st === 'missing' || st === 'hash_mismatch' || st === 'verifying_hash' || st === 'error';
-            if (!inPreflightState) {
-                this.localVmFixPhase = null;
-                this.localVmDownloadPercent = null;
-                this.localVmBusy = false;
-            }
-        },
-    },
-
-
     methods: {
         isIOS,
         // major or minor differs from the exam server
@@ -491,23 +397,6 @@ export default {
             });
         },
 
-        async showQemuMissingWarning(payload = {}) {
-            this.closeLocalVmCompatCheckDialog();
-            await showLocalVmQemuIssueDialog({
-                swal: this.$swal,
-                t: this.$t.bind(this),
-                invoke: (channel, ...args) => window.ipcRenderer.invoke(channel, ...args),
-                i18nPrefix: 'student',
-                check: payload || {},
-                cancelKey: 'cancel',
-            });
-            if (!this.clientinfo) {
-                this.clientinfo = {};
-            }
-            this.clientinfo.examtype = 'localvm';
-            this.clientinfo.localVMState = 'error';
-        },
-
         // Post-exam quit prompt (replaces the old native main-process dialog). Ja -> quit, Nein -> stay.
         showExitQuestion() {
             if (this.exitQuestionSwalOpen) { return; }
@@ -527,39 +416,6 @@ export default {
             }).finally(() => {
                 this.exitQuestionSwalOpen = false;
             });
-        },
-
-        // Swal while main runs QEMU / hypervisor compatibility probes before LocalVM exam start.
-        showLocalVmCompatCheckDialog() {
-            if (this.localVmCompatCheckSwalOpen) {
-                return;
-            }
-            this.localVmCompatCheckSwalOpen = true;
-            const text = String(this.$t('student.localvmCompatCheckText') || '');
-            void this.$swal.fire({
-                title: this.$t('student.localvmCompatCheckTitle'),
-                html: text.replace(/\n/g, '<br>'),
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                showConfirmButton: false,
-                didOpen: () => {
-                    // didOpen fires async; if end already closed it, showLoading() would spawn a new empty Swal
-                    if (this.localVmCompatCheckSwalOpen) this.$swal.showLoading();
-                },
-            }).finally(() => {
-                this.localVmCompatCheckSwalOpen = false;
-            });
-        },
-
-        closeLocalVmCompatCheckDialog() {
-            clearTimeout(this.localVmCompatCheckTimer);
-            if (!this.localVmCompatCheckSwalOpen) {
-                return;
-            }
-            this.localVmCompatCheckSwalOpen = false;
-            try {
-                this.$swal.close();
-            } catch (e) {}
         },
 
         kioskI18n(suffix) {
@@ -1570,325 +1426,8 @@ export default {
             }
         },
 
-        getLocalVmConfig() {
-            const sectionIndex = Number(this.clientinfo?.lockedSection || 1);
-            const section = this.serverstatus?.examSections?.[sectionIndex] || {};
-            const group = this.clientinfo?.group === 'b' ? 'b' : 'a';
-            const cfg = group === 'b' ? (section?.groupB?.examConfig?.localvm || {}) : (section?.groupA?.examConfig?.localvm || {});
-            return cfg || {};
-        },
-
-        async retryLocalVmStart() {
-            if (this.localVmBusy) return;
-            try {
-                this.localVmBusy = true;
-                this.localVmFixPhase = null;
-                const res = await window.ipcRenderer.invoke('localvm-retry-start');
-                if (!res?.ok) {
-                    await this.status(this.$t('student.localvmStartError'));
-                }
-            } catch (e) {
-                loggingBridge.error('student.vue @ retryLocalVmStart', e);
-                await this.status(this.$t('student.localvmStartError'));
-            } finally {
-                this.localVmBusy = false;
-            }
-        },
-
-        async downloadVm() {
-            if (this.localVmBusy) return;
-            try {
-                this.localVmBusy = true;
-                this.localVmDownloadPercent = null;
-                this.localVmFixPhase = 'downloading';
-                const cfg = this.getLocalVmConfig();
-                const filename = cfg.qcow2Name;
-                const overwrite = this.clientinfo?.localVMState === 'hash_mismatch';
-                if (!filename) {
-                await this.status(this.$t('student.localvmNoVmConfigured'));
-                    return;
-                }
-            await this.status(this.$t('student.localvmDownloadingFromTeacher'));
-                const res = await window.ipcRenderer.invoke('qemu-download-disk', {
-                    serverip: this.clientinfo?.serverip,
-                    serverApiPort: this.serverApiPort,
-                    servername: this.clientinfo?.servername,
-                    studenttoken: this.token,
-                    filename,
-                    overwrite
-                });
-                if (!res || !res.ok) {
-                await this.status(this.$t('student.localvmDownloadFailed'));
-                    this.localVmFixPhase = null;
-                    return;
-                }
-            await this.status(this.$t('student.localvmDownloadDoneWaiting'));
-                this.localVmFixPhase = 'waiting_for_start';
-            } catch (e) {
-                loggingBridge.error('student.vue @ downloadVm', e);
-            await this.status(this.$t('student.localvmDownloadFailed'));
-                this.localVmFixPhase = null;
-            } finally {
-                this.localVmBusy = false;
-                if (this.localVmFixPhase !== 'waiting_for_start') {
-                    this.localVmDownloadPercent = null;
-                }
-            }
-        },
-
-        async browseVm() {
-            if (this.localVmBusy) return;
-            try {
-                this.localVmBusy = true;
-                const pick = await window.ipcRenderer.invoke('qemu-pick-disk-file');
-                if (!pick?.ok || pick.cancelled) {
-                    await this.status(this.$t('student.localvmImportCancelled'));
-                    this.localVmFixPhase = null;
-                    return;
-                }
-                this.localVmFixPhase = 'importing';
-                this.localVmDownloadPercent = null;
-                const res = await window.ipcRenderer.invoke('qemu-import-disk', { sourcePath: pick.sourcePath });
-                const filename = res && res.ok ? res.filename : null;
-                if (!filename) {
-                    await this.status(this.$t('student.localvmImportFailed'));
-                    this.localVmFixPhase = null;
-                    return;
-                }
-                await this.status(this.$t('student.localvmImportDoneWaiting', { filename }));
-                this.localVmFixPhase = 'waiting_for_start';
-            } catch (e) {
-                loggingBridge.error('student.vue @ browseVm', e);
-                await this.status(this.$t('student.localvmImportFailed'));
-                this.localVmFixPhase = null;
-            } finally {
-                this.localVmBusy = false;
-                if (this.localVmFixPhase !== 'waiting_for_start') {
-                    this.localVmDownloadPercent = null;
-                }
-            }
-        },
-
-
-        extractServerNames(list) {
-            return list.map(item => item.servername).sort();
-        },
-
-        toggleAdvanced() {
-            if (!this.advanced) {
-                this.servertimeout = 0
-                this.serverip = ""
-            }
-        },
-
-
-        //show status message
-        async status(text) {
-            const statusDiv = document.querySelector("#statusdiv");
-            statusDiv.textContent = text;
-            statusDiv.style.visibility = "visible";
-            this.fadeIn(statusDiv);
-            await this.sleep(2000);
-            this.fadeOut(statusDiv)
-        },
-
-
-        // implementing a sleep (wait) function
-        sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        },
-
-        // Drop server registration (same as system tray disconnect)
-        disconnectClient() {
-            this.$swal({
-                title: this.$t("student.unregister"),
-                text: this.$t("student.logoutBiP"),
-                showCancelButton: true,
-                confirmButtonText: 'Ok',
-                cancelButtonText: this.$t("editor.cancel"),
-                focusConfirm: false,
-                icon: 'question',
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.ipcRenderer.send('disconnect');
-                    this.token = '';
-                }
-            });
-        },
-
-        /** register client on the server **/
-        async registerClient(serverip, servername) {
-            if (this.username === "") {
-                this.$swal.fire({ title: "Error", text: this.$t("student.nouser"), icon: 'error', showCancelButton: false });
-                return;
-            }
-            if (this.pincode === "") {
-                this.$swal.fire({ title: "Error", text: this.$t("student.nopin"), icon: 'error', showCancelButton: false });
-                return;
-            }
-            // capturePage path (macOS + Linux Cage) was already selected at init via setCageWindowCaptureFallback.
-            // Windows uses getDisplayMedia. iOS has no screenshotCapture scheduler.
-            if (isElectronWindow() && !isCageWindowCaptureFallback()) {
-                if (!hasActiveScreenshotStream()) {
-                    const ok = await ensureDisplayStreamAsync();
-                    if (!ok) {
-                        this.$swal.fire({ title: "Error", text: this.$t("student.screenshotpermission"), icon: 'error', showCancelButton: false });
-                        return;
-                    }
-                }
-                if (!isFullDesktopCaptureLikely() && !this.development) {
-                    this.$swal.fire({ title: "Error", text: this.$t("student.screenshotarea"), icon: 'error', showCancelButton: false });
-                    return;
-                }
-            }
-            const displayInfo = await window.ipcRenderer.invoke('getinfoasync');
-            if (displayInfo?.clientinfo?.multiMonitor && !this.development) {
-                this.$swal.fire({ title: "Error", text: this.$t("student.multimonitor"), icon: 'error', showCancelButton: false });
-                return;
-            }
-
-            const charMap = {
-                    'ć': 'c',
-                    'č': 'c',
-                    'š': 's',
-                    'ž': 'z',
-                    'đ': 'd',
-                    // Add more mappings as needed
-                };
-
-
-                //check username - remove leading and trailing spaces
-                this.username = normalizeStudentClientName(
-                    this.username
-                        .replace(/[^\x00-\x7F]/g, char => charMap[char] || char)
-                );
-
-
-                //  loggingBridge.info({clientname:this.username, servername:servername, serverip, serverip, pin:this.pincode, bipuserID:this.bipuserID })
-                const IPCresponse = await registerWithTeacherCertificate(this, {
-                    clientname: this.username,
-                    servername: servername,
-                    serverip: serverip,
-                    //serverip,
-                    pin: this.pincode+"",
-                    bipuserID: this.bipuserID+""
-                })
-                if (!IPCresponse) return
-                if (IPCresponse) {
-                    loggingBridge.info(`student @ registerClient: ${IPCresponse.message}`)
-                    if (IPCresponse.token) {
-                        this.token = IPCresponse.token  // set token (used to determine server connection status)
-                    }
-                }
-
-                if (IPCresponse && IPCresponse.status === "success") {
-                    // Registration proves the API is reachable; the ping loop stops once a token exists,
-                    // so clear a stale unreachable mark here (e.g. after the Teacher restarted).
-                    const registeredServer = this.serverlist.find(s => s.serverip === serverip)
-                    if (registeredServer) { registeredServer.reachable = true }
-                    const okBody = IPCresponse.reconnected ? this.$t("student.reconnectedinfo") : this.$t("student.registeredinfo")
-                    this.$swal.fire({
-                        title: "OK",
-                        html: `<div style="white-space: pre-line;">${okBody}</div>`,
-                        icon: 'success',
-                        timer: 6000,
-                        showCancelButton: false,
-                    })
-
-
-                }
-                if (IPCresponse && IPCresponse.status === "error") {
-                    this.$swal.fire({
-                        title: "Error",
-                        text: registrationErrorText(this, IPCresponse),
-                        icon: 'error',
-                        showCancelButton: false,
-                    })
-                }
-        },
-        showCopyleft() {
-            this.$swal.fire({
-                title: "<span id='cpleft' class='active' style='display:inline-block; transform: scaleX(-1); vertical-align: middle; cursor: pointer;'>&copy;</span> <span style='font-size:0.7em'>Thomas Michael Weissel </span>",
-                icon: 'info',
-                html: `
-                <a href="https://www.bmb.gv.at/Themen/schule/zrp/dibi/foss.html" target="_blank"><img style="width: 230px; opacity:1;" src="/img/BMB_Logo_srgb.png"></a>
-                <br>
-                <br>
-                <a href="https://linux-bildung.at" target="_blank"><img style="width: 50px; opacity:0.7;" src="/img/osos.svg"></a>   <br>
-                <span style="font-size:0.8em"> <a href="https://next-exam.at" target="_blank">next-exam.at</a> </span> <br>
-                <span style="font-size:0.8em">Version: ${this.version} ${this.info}</span> <br>
-                <span style="font-size:0.8em">Build: ${this.buildDate}</span>
-                `,
-                didOpen: () => {
-
-                },
-                didRender: () => {
-                    document.getElementById('cpleft').onclick = () => this.easter();
-                }
-            })
-        },
-        easter() {
-            if (this.biptest) {
-                this.biptest = false
-                document.getElementById('cpleft').classList.toggle('active');
-                document.getElementById('cpleft').classList.toggle('inactive');
-            } else {
-                this.biptest = true
-                document.getElementById('cpleft').classList.toggle('active');
-                document.getElementById('cpleft').classList.toggle('inactive');
-            }
-        },
-
-        // Function to add fade-in effect
-        fadeIn(element) {
-            element.classList.add('fade-in');
-            element.classList.remove('fade-out');
-        },
-
-        // Function to add fade-out effect
-        fadeOut(element) {
-            element.classList.add('fade-out');
-            element.classList.remove('fade-in');
-        },
-
-
-        async bipAutoUpdate() {
-            if (this.bipToken) {
-                this.username = this.bipUsername
-                await this.fetchBipExams()
-                if (!this.token) {
-                    this.bipAutoconnect()
-                }
-            } else {
-                this.onlineExams = []
-            }
-        }
-
     },
     created() {
-        // Register before mounted awaits so early LocalVM IPC is not dropped.
-        window.ipcRenderer.on('localvm-compat-check-start', () => {
-            if (!this.clientinfo) {
-                this.clientinfo = {};
-            }
-            this.clientinfo.examtype = 'localvm';
-            this.clientinfo.localVMState = 'checking_compat';
-            // delayed: end usually follows within ms; open+close in quick succession leaves a stuck Swal
-            clearTimeout(this.localVmCompatCheckTimer);
-            this.localVmCompatCheckTimer = setTimeout(() => this.showLocalVmCompatCheckDialog(), 500);
-        });
-
-        window.ipcRenderer.on('localvm-compat-check-end', () => {
-            if (this.clientinfo?.localVMState === 'checking_compat') {
-                this.clientinfo.localVMState = null;
-            }
-            this.closeLocalVmCompatCheckDialog();
-        });
-
-        window.ipcRenderer.on('qemu-not-available', (_event, payload) => {
-            void this.showQemuMissingWarning(payload || {});
-        });
-
         window.ipcRenderer.on('show-exit-question', () => {
             this.showExitQuestion();
         });
@@ -1968,11 +1507,6 @@ export default {
             useInfoStore().bipUserId = bipUserId
         });
 
-        window.ipcRenderer.on('qemu-download-progress', (_event, payload) => {
-            const pct = payload && typeof payload.percent === 'number' ? payload.percent : null;
-            this.localVmDownloadPercent = pct;
-        });
-
         // Screenshot scheduler only in main window (this page); exam window never loads student.vue
         initScreenshotScheduler();
 
@@ -1987,10 +1521,6 @@ export default {
         window.removeEventListener('unhandledrejection', event => unhandledRejectionFunction(event));
 
         window.ipcRenderer.removeAllListeners('bip-user-id');
-        window.ipcRenderer.removeAllListeners('qemu-download-progress');
-        window.ipcRenderer.removeAllListeners('localvm-compat-check-start');
-        window.ipcRenderer.removeAllListeners('localvm-compat-check-end');
-        window.ipcRenderer.removeAllListeners('qemu-not-available');
         window.ipcRenderer.removeAllListeners('show-exit-question');
         window.ipcRenderer.removeAllListeners('close-exit-question');
     }
@@ -2091,73 +1621,6 @@ body {
     margin-top: 12px;
     font-size: 0.95rem;
     opacity: 0.92;
-}
-
-.localvm-preflight-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 200000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-}
-
-.localvm-preflight-card {
-    width: 100%;
-    max-width: 520px;
-    border-radius: 10px;
-    background: rgba(33, 37, 41, 0.95);
-    color: #f8f9fa;
-    padding: 16px 18px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-    text-align: center;
-}
-
-.localvm-preflight-title {
-    font-weight: 700;
-    margin-bottom: 10px;
-}
-
-.localvm-preflight-verify {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 0;
-}
-
-.localvm-preflight-spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #93c5fd;
-    border-radius: 50%;
-    animation: localvm-preflight-spin 0.85s linear infinite;
-}
-
-@keyframes localvm-preflight-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.localvm-preflight-text {
-    font-size: 0.95em;
-}
-
-.localvm-preflight-subtext {
-    font-size: 0.85em;
-    color: rgba(248, 249, 250, 0.75);
-}
-
-.localvm-preflight-actions {
-    margin-top: 12px;
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    flex-wrap: wrap;
 }
 
 #content {

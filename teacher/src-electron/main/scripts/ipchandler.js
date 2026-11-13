@@ -38,13 +38,6 @@ import { isAllowedExamFileName } from '../../../../shared/allowedExamFileTypes.j
 import ip from 'ip'
 import dns from 'dns'
 import net from 'node:net'
-import qemuService from './qemuService.js'
-import {
-    checkQemuAvailability,
-    getQemuInstallInfo,
-    getWindowsHypervisorPlatformState,
-    requestEnableWindowsHypervisorPlatform,
-} from '../../../../shared/qemuAvailability.js'
 import archiver from 'archiver'
 
 import server from "../../server/src/server.js"
@@ -554,226 +547,6 @@ class IpcHandler {
         })  
 
 
-        /**
-         * QEMU integration (LocalVM, qcow2 in workdir/QEMU)
-         */
-        ipcMain.handle('qemu-check-available', async (_event, opts = {}) => {
-            const quick = opts?.deep === false || opts?.quick === true;
-            log.info(`ipchandler @ qemu-check-available: start quick=${quick} opts=${JSON.stringify(opts || {})}`);
-            try {
-                const res = await checkQemuAvailability(opts);
-                log.info(`ipchandler @ qemu-check-available: ok=${res.ok} missing=${(res.missing || []).join(',') || '-'}`);
-                return res;
-            } catch (e) {
-                log.error('ipchandler @ qemu-check-available', e)
-                const install = getQemuInstallInfo()
-                return {
-                    ok: false,
-                    missing: ['qemu-system-x86_64', 'qemu-img'],
-                    downloadUrl: install.downloadUrl,
-                    installHint: install.installHint,
-                }
-            }
-        })
-
-        ipcMain.handle('qemu-open-install-page', async () => {
-            try {
-                const { downloadUrl } = getQemuInstallInfo()
-                await shell.openExternal(downloadUrl)
-                return { ok: true }
-            } catch (e) {
-                log.error('ipchandler @ qemu-open-install-page', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-check-hypervisor-platform', async () => {
-            try {
-                return await getWindowsHypervisorPlatformState()
-            } catch (e) {
-                log.error('ipchandler @ qemu-check-hypervisor-platform', e)
-                return { supported: false, enabled: false, state: 'error' }
-            }
-        })
-
-        ipcMain.handle('qemu-request-enable-hypervisor-platform', async () => {
-            try {
-                return requestEnableWindowsHypervisorPlatform()
-            } catch (e) {
-                log.error('ipchandler @ qemu-request-enable-hypervisor-platform', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-list-disks', async () => {
-            log.info(`ipchandler @ qemu-list-disks: workdirectory=${config.workdirectory}`);
-            try {
-                const disks = await qemuService.listDisks({ workdirectory: config.workdirectory });
-                log.info(`ipchandler @ qemu-list-disks: returning ${disks.length} name(s)`);
-                return disks;
-            } catch (e) {
-                log.error('ipchandler @ qemu-list-disks', e)
-                return []
-            }
-        })
-
-        // default VM name offered in the install dialog (next free win11-N)
-        ipcMain.handle('qemu-suggest-disk-name', async () => {
-            try {
-                return await qemuService.suggestDiskName({ workdirectory: config.workdirectory })
-            } catch (e) {
-                log.error('ipchandler @ qemu-suggest-disk-name', e)
-                return ''
-            }
-        })
-
-        ipcMain.handle('qemu-install-default', async (_event, payload = {}) => {
-            const isoPath = payload?.isoPath || null
-            const diskName = payload?.diskName || null
-            try {
-                const avail = await checkQemuAvailability()
-                if (!avail.ok) {
-                    log.warn('ipchandler @ qemu-install-default: QEMU not available', avail.missing)
-                    return { ok: false, qemuMissing: true, missing: avail.missing }
-                }
-                log.info(`ipchandler @ qemu-install-default: requested isoPath=${isoPath || '-'} diskName=${diskName || '-'}`);
-                const sendProgress = (p) => {
-                    try { this.WindowHandler?.mainwindow?.webContents?.send?.('qemu-install-progress', p); } catch (e) {}
-                };
-                sendProgress({ phase: 'start', file: null, percent: 0 });
-                const res = await qemuService.installDefaultVm({ workdirectory: config.workdirectory, isoPath, diskName, onProgress: sendProgress })
-                sendProgress({ phase: 'end', file: null, percent: 100 });
-                return res;
-            } catch (e) {
-                log.error('ipchandler @ qemu-install-default', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-hash-disk', async (_event, payload = {}) => {
-            try {
-                const { qcow2Name } = payload || {}
-                const sha256 = await qemuService.hashDisk({ workdirectory: config.workdirectory, qcow2Name })
-                return { ok: true, sha256 }
-            } catch (e) {
-                log.error('ipchandler @ qemu-hash-disk', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-stat-disk', async (_event, payload = {}) => {
-            try {
-                const { qcow2Name } = payload || {}
-                const { size } = await qemuService.statDisk({ workdirectory: config.workdirectory, qcow2Name })
-                return { ok: true, size }
-            } catch (e) {
-                log.error('ipchandler @ qemu-stat-disk', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-boot-disk', async (_event, payload = {}) => {
-            const { qcow2Name, useOverlay, displayResolution } = payload || {};
-            log.info(`ipchandler @ qemu-boot-disk: qcow2=${qcow2Name} useOverlay=${!!useOverlay} display=${displayResolution || '-'}`);
-            try {
-                log.info('ipchandler @ qemu-boot-disk: deep QEMU check…');
-                const avail = await checkQemuAvailability();
-                if (!avail.ok) {
-                    log.warn('ipchandler @ qemu-boot-disk: QEMU not available', avail.missing)
-                    return { ok: false, qemuMissing: true, missing: avail.missing }
-                }
-                return await qemuService.bootDisk({
-                    workdirectory: config.workdirectory,
-                    qcow2Name,
-                    useOverlay: useOverlay === true,
-                    displayResolution,
-                })
-            } catch (e) {
-                log.error('ipchandler @ qemu-boot-disk', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        // manual selection of a Windows install ISO for the LocalVM build
-        ipcMain.handle('qemu-pick-install-iso', async () => {
-            log.info('ipchandler @ qemu-pick-install-iso: opening file dialog…');
-            try {
-                const result = await dialog.showOpenDialog(this.WindowHandler.mainwindow, {
-                    properties: ['openFile'],
-                    filters: [{ name: 'Windows Install ISO', extensions: ['iso'] }],
-                })
-                if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-                    log.info('ipchandler @ qemu-pick-install-iso: cancelled');
-                    return { ok: false, cancelled: true }
-                }
-                log.info(`ipchandler @ qemu-pick-install-iso: selected ${result.filePaths[0]}`);
-                return { ok: true, sourcePath: result.filePaths[0] }
-            } catch (e) {
-                log.error('ipchandler @ qemu-pick-install-iso', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-pick-disk-file', async () => {
-            log.info('ipchandler @ qemu-pick-disk-file: opening file dialog…');
-            try {
-                const result = await dialog.showOpenDialog(this.WindowHandler.mainwindow, {
-                    properties: ['openFile'],
-                    filters: [{ name: 'QEMU Disk', extensions: ['qcow2'] }],
-                })
-                if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-                    log.info('ipchandler @ qemu-pick-disk-file: cancelled');
-                    return { ok: false, cancelled: true }
-                }
-                log.info(`ipchandler @ qemu-pick-disk-file: selected ${result.filePaths[0]}`);
-                return { ok: true, sourcePath: result.filePaths[0] }
-            } catch (e) {
-                log.error('ipchandler @ qemu-pick-disk-file', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-import-disk', async (event, payload = {}) => {
-            try {
-                const { sourcePath } = payload || {}
-                if (!sourcePath) {
-                    log.warn('ipchandler @ qemu-import-disk: missing sourcePath');
-                    return { ok: false, error: 'invalid sourcePath' }
-                }
-                log.info(`ipchandler @ qemu-import-disk: import ${sourcePath}`);
-                const sendProgress = (p) => {
-                    try { event.sender?.send?.('qemu-import-progress', p); } catch (e) {}
-                };
-                const res = await qemuService.importDisk({
-                    workdirectory: config.workdirectory,
-                    sourcePath,
-                    onProgress: sendProgress,
-                });
-                log.info(`ipchandler @ qemu-import-disk: done ok=${res.ok} filename=${res.filename} skipped=${!!res.skipped} linked=${!!res.linked}`);
-                return res;
-            } catch (e) {
-                log.error('ipchandler @ qemu-import-disk', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-        ipcMain.handle('qemu-pick-import-disk', async () => {
-            try {
-                const result = await dialog.showOpenDialog(this.WindowHandler.mainwindow, {
-                    properties: ['openFile'],
-                    filters: [{ name: 'QEMU Disk', extensions: ['qcow2'] }],
-                })
-                if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-                    return { ok: false, cancelled: true }
-                }
-                return await qemuService.importDisk({ workdirectory: config.workdirectory, sourcePath: result.filePaths[0] })
-            } catch (e) {
-                log.error('ipchandler @ qemu-pick-import-disk', e)
-                return { ok: false, error: String(e?.message || e) }
-            }
-        })
-
-
         ipcMain.handle('ensureMsAccessToken', async (event, force) => ensureMsAccessToken(config, !!force))
 
         // log out of microsoft 365
@@ -1175,9 +948,6 @@ class IpcHandler {
                 /* directory may already exist */
             }
             const storedFiles = []
-            // localvm: the VM may need any file type, otherwise only the exam file types
-            const st = mcServer.serverstatus
-            const anyFileType = st?.examSections?.[st?.activeSection]?.examtype === 'localvm'
             for (const item of fileItems) {
                 const rawName = item?.name ?? 'upload'
                 let filename = path.basename(decodeURIComponent(rawName))
@@ -1185,7 +955,7 @@ class IpcHandler {
                     log.error(`ipchandler @ uploadTeacherFiles: rejected unsafe upload name (${rawName})`)
                     continue
                 }
-                if (!anyFileType && !isAllowedExamFileName(filename)) {
+                if (!isAllowedExamFileName(filename)) {
                     log.warn(`ipchandler @ uploadTeacherFiles: rejected file type (${filename})`)
                     continue
                 }

@@ -85,7 +85,6 @@ export type ExamConfig = {
   math: Record<string, unknown>,
   microsoft365: Microsoft365Config,
   rdp: RdpConfig,
-  localvm: Record<string, unknown>,
 }
 
 export type ActiveSheetsConfig = {

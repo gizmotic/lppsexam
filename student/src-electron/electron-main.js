@@ -41,7 +41,6 @@ import { updateSystemTray } from './main/scripts/traymenu.js'
 import JreHandler from './main/scripts/jre-handler.js';
 import { checkParentProcess } from './main/scripts/checkparent.js';
 
-import { stopProxy } from './main/scripts/vncproxy.js';
 import { stopAssessmentSession } from './main/scripts/assessmentSession.js';
 import { ensureWindowsExplorerRunning } from './main/scripts/restrictions/win.js';
 import { initErrorHandling } from './main/scripts/errorHandling.js';
@@ -262,8 +261,6 @@ app.on('window-all-closed', async () => {  // last window closed – clear stora
     if (WindowHandler.checkWindowInterval?.stop) WindowHandler.checkWindowInterval.stop()
     if (CommHandler.updateScheduler?.stop) CommHandler.updateScheduler.stop()
     if (multicastClient.refreshExamsScheduler?.stop) multicastClient.refreshExamsScheduler.stop()
-    // ensure any running vncproxy-helper child is terminated before quit
-    try { stopProxy() } catch (err) { log.warn('main @ window-all-closed: stopProxy failed', err) }
     WindowHandler.mainwindow = null
 
     try {

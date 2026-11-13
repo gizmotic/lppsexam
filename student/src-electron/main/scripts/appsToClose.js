@@ -4,7 +4,7 @@
  * Leaf module: apps that must not run during an exam (kill + remote-assistant keyword detect).
  * Matching is case-insensitive substring on process name/cmdline,
  * EXCEPT macOS pkill -f which is case-sensitive -> TitleCase duplicates are intentional.
- * Sorted alphabetically (case-insensitive). Never add bare 'vnc' (kills vncproxy-helper).
+ * Sorted alphabetically (case-insensitive).
  */
 export const appsToClose = [
     'anydesk',

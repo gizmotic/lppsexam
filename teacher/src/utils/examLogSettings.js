@@ -11,8 +11,6 @@ const getBaseMaterialUrl = (examtype, examConfig, section) => {
             return examConfig.forms?.url || null
         case 'rdp':
             return examConfig.rdp?.domain || null
-        case 'localvm':
-            return examConfig.localvm?.qcow2Name || null
         case 'activesheets':
             return examConfig.activeSheets?.filename || null
         case 'microsoft365':

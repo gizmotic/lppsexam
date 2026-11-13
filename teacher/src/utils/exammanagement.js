@@ -22,49 +22,6 @@ async function startExam(){
     const rawSection = Number(this.serverstatus.activeSection) || 1
     const sectionIndex = Math.min(Math.max(1, rawSection), 4)
 
-    // LocalVM/QEMU hash is computed when selecting the disk (configureLocalVM) – if enabled.
-    try {
-        const examSection = this.serverstatus.examSections[sectionIndex]
-        if (examSection?.examtype === 'localvm') {
-            const hasGroups = !!examSection.groups
-            const cfgA = examSection?.groupA?.examConfig?.localvm || {}
-            const cfgB = examSection?.groupB?.examConfig?.localvm || {}
-            const wantsHashA = cfgA.calculateSha256 === true
-            const wantsHashB = cfgB.calculateSha256 === true
-            if (!hasGroups) {
-                if (cfgA.qcow2Name && wantsHashA && !cfgA.qcow2Sha256) {
-                    this.status('LocalVM: Hash fehlt – bitte VM-Disk erneut wählen.')
-                    return
-                }
-                if (cfgA.qcow2Name && !wantsHashA && !cfgA.qcow2SizeBytes) {
-                    this.status('LocalVM: Dateigröße fehlt – bitte VM-Disk erneut wählen.')
-                    return
-                }
-            } else {
-                if (cfgA.qcow2Name && wantsHashA && !cfgA.qcow2Sha256) {
-                    this.status('LocalVM: Hash fehlt (Gruppe A) – bitte VM-Disk erneut wählen.')
-                    return
-                }
-                if (cfgB.qcow2Name && wantsHashB && !cfgB.qcow2Sha256) {
-                    this.status('LocalVM: Hash fehlt (Gruppe B) – bitte VM-Disk erneut wählen.')
-                    return
-                }
-                if (cfgA.qcow2Name && !wantsHashA && !cfgA.qcow2SizeBytes) {
-                    this.status('LocalVM: Dateigröße fehlt (Gruppe A) – bitte VM-Disk erneut wählen.')
-                    return
-                }
-                if (cfgB.qcow2Name && !wantsHashB && !cfgB.qcow2SizeBytes) {
-                    this.status('LocalVM: Dateigröße fehlt (Gruppe B) – bitte VM-Disk erneut wählen.')
-                    return
-                }
-            }
-        }
-    } catch (e) {
-        log.error('exammanagement @ startExam: localvm hash missing check failed', e)
-        this.status('LocalVM: Konfiguration ungültig.')
-        return
-    }
-
     this.serverstatus.examSections[sectionIndex].locked = true;   // starting exammode locks the current active section
     this.serverstatus.lockedSection = sectionIndex;
     this.serverstatus.examSections[sectionIndex].startTs = now
@@ -468,9 +425,7 @@ function sendFiles(who) {
         const st = this.studentlist.find((s) => s.token === who);
         if (!isStudentReachable(st, now)) { this.status(this.$t("dashboard.noclients")); return; }
     }
-    // localvm: the VM may need any file type, otherwise only the exam file types
-    const anyFileType = this.serverstatus.examSections[this.serverstatus.activeSection]?.examtype === 'localvm'
-    const fileTypeHint = anyFileType ? this.$t("dashboard.allfiletypes") : ALLOWED_EXAM_FILE_ACCEPT
+    const fileTypeHint = ALLOWED_EXAM_FILE_ACCEPT
     let htmlcontent = `<div class="my-content"> 
         ${this.$t("dashboard.filesendtext")} <br>
         <span style="font-size:0.8em;">(${fileTypeHint})</span>
@@ -512,11 +467,10 @@ function sendFiles(who) {
             id: "swalFile",
             class:"form-control",
             multiple:"multiple",
-            ...(anyFileType ? {} : { accept: ALLOWED_EXAM_FILE_ACCEPT })
+            accept: ALLOWED_EXAM_FILE_ACCEPT
         },
         inputValidator: (value) => {
             // accept is only a picker hint - re-check before anything is sent
-            if (anyFileType) return
             const bad = disallowedExamFileNames(value)
             if (bad.length) return this.$t('dashboard.filetypenotallowed', { files: bad.join(', '), allowed: ALLOWED_EXAM_FILE_ACCEPT })
         },

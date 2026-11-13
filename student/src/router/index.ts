@@ -40,7 +40,6 @@ const microsoft365 = () => import('/src/pages/microsoft365.vue')
 const website = () => import('/src/pages/website.vue')
 const activesheets = () => import('/src/pages/activesheets.vue')
 const rdpview = () => import('/src/pages/rdpview.vue')
-const localvmview = () => import('/src/pages/localvmview.vue')
 
 
 
@@ -65,7 +64,6 @@ const routes = [ // to load a specific view just replace the component at path: 
     { path: '/microsoft365/:token/:section', name:"microsoft365", component: microsoft365, beforeEnter: [fetchInfo] },
     { path: '/lock',                name:"lock",         component: lock },
     { path: '/rdp/:token/:section',          name:"rdp",          component: rdpview,      beforeEnter: [fetchInfo] },
-    { path: '/localvm/:token/:section',      name:"localvm",      component: localvmview,  beforeEnter: [fetchInfo] },
     { path: '/:pathMatch(.*)*',     name:"404",          component: notfound },  
 ]
 

@@ -39,11 +39,6 @@ import { examApiFetch, isCertificateError } from './examApiFetch.js'
 import languageToolServer from './lt-server.js';
 import { setClientFocusLock, clearClientFocusLock } from './focusLockState.js';
 import { syncClientDisplayInfo } from './displayInfo.js';
-import qemuService from './qemuService.js';
-import { checkQemuAvailability } from '../../../../shared/qemuAvailability.js';
-import { getQemuInstallInfo } from '../../../../shared/qemuInstallInfo.js';
-import { pickLocalVmGroupConfig } from '../../../../shared/localVmDisplayResolutions.js';
-import { stopProxy } from './vncproxy.js';
 import { switchExamSection } from './switchExamSection.js';
 import { createPdfExportResult, createPdfFooterTemplate, createPdfHeaderTemplate, formatPdfHeaderDate, submissionSignReasons } from '../../../../shared/pdfExportShared.js';
 import {
@@ -73,7 +68,6 @@ import {
         this.multicastClient = mc
         this.config = config
         this.lastExamWriteSaveReason = 'n/a' // updated on successful examdir writes; sent with ZIP to teacher /receive
-        this.localVmStartState = 'idle' // idle|starting|blocked
         this._startExamRunning = false
         this._endExamRunning = false
         this.updateScheduler = new SchedulerService(this.requestUpdate.bind(this), 5000)
@@ -104,10 +98,8 @@ import {
      * Moves files received from the teacher (extracted to stagingDir) into targetDir, encrypting them with
      * the exam key on the way. Only these files get encrypted - plaintext files already lying in the
      * examdirectory (e.g. placed by the student) stay plaintext and are therefore ignored by the exam.
-     * localvm keeps plaintext on purpose (the VM reads the share directly).
      */
     async installReceivedFiles(stagingDir, targetDir) {
-        const plainAllowed = this.multicastClient?.clientinfo?.examtype === 'localvm';
         const pw = String(this.multicastClient?.serverstatus?.encryptionPassword ?? '').trim();
         const dirents = await fs.promises.readdir(stagingDir, { withFileTypes: true });
         await fs.promises.mkdir(targetDir, { recursive: true });
@@ -120,7 +112,7 @@ import {
             }
             if (!d.isFile()) continue;
             let out = await fs.promises.readFile(src);
-            if (!plainAllowed && pw && !isExamFileEncryptedBytes(out)) {
+            if (pw && !isExamFileEncryptedBytes(out)) {
                 out = encryptExamFileBytes(out, pw);
                 log.info(`communicationhandler @ installReceivedFiles: encrypted write ${d.name}`);
             }
@@ -134,169 +126,6 @@ import {
             }
         }
     }
-
-    // Tell student UI to show compat-check Swal before slow QEMU / disk probes.
-    notifyLocalVmCompatCheckStart() {
-        this.multicastClient.clientinfo.examtype = 'localvm';
-        this.multicastClient.clientinfo.localVMState = 'checking_compat';
-        try {
-            WindowHandler.mainwindow?.webContents?.send('localvm-compat-check-start');
-        } catch (e) {
-            log.debug('communicationhandler @ notifyLocalVmCompatCheckStart: send failed', e?.message);
-        }
-    }
-
-    // Dismiss compat-check Swal when leaving checking_compat (success, failure, or next preflight state).
-    notifyLocalVmCompatCheckEnd() {
-        if (this.multicastClient.clientinfo.localVMState === 'checking_compat') {
-            this.multicastClient.clientinfo.localVMState = null;
-        }
-        try {
-            WindowHandler.mainwindow?.webContents?.send('localvm-compat-check-end');
-        } catch (e) {
-            log.debug('communicationhandler @ notifyLocalVmCompatCheckEnd: send failed', e?.message);
-        }
-    }
-
-    // True when LocalVM preflight failed and the user must invoke localvm-retry-start.
-    _localVmAwaitingRetry() {
-        if (this.multicastClient.clientinfo.exammode) {
-            return false;
-        }
-        const st = this.multicastClient.clientinfo.localVMState;
-        return st === 'error' || st === 'missing' || st === 'hash_mismatch';
-    }
-
-    // Probe system QEMU; caller shows UI after compat-check Swal is dismissed.
-    async ensureQemuAvailableForLocalVm() {
-        try {
-            const check = await checkQemuAvailability();
-            if (check.ok) {
-                return { ok: true, check };
-            }
-            log.warn('communicationhandler @ ensureQemuAvailableForLocalVm: QEMU missing', check.missing);
-            return { ok: false, check };
-        } catch (e) {
-            log.error('communicationhandler @ ensureQemuAvailableForLocalVm', e);
-            const install = getQemuInstallInfo();
-            return {
-                ok: false,
-                check: {
-                    missing: ['qemu-system-x86_64', 'qemu-img'],
-                    downloadUrl: install.downloadUrl,
-                    installHint: install.installHint,
-                },
-            };
-        }
-    }
-
-    // SHA-256 of base qcow2 before QEMU start (full read while VM runs starves guest disk I/O).
-    async runLocalVmPreStartVerify(qcow2Name, expectedSha256, expectedSizeBytes) {
-        try {
-            if (expectedSha256) {
-                log.info(`communicationhandler @ runLocalVmPreStartVerify: sha256 before start for ${qcow2Name}`);
-            } else {
-                log.info(`communicationhandler @ runLocalVmPreStartVerify: size check before start for ${qcow2Name} (expectedBytes=${expectedSizeBytes})`);
-            }
-            const verify = expectedSha256
-                ? await qemuService.verifyDiskSha256({
-                    workdirectory: this.config.workdirectory,
-                    qcow2Name,
-                    expectedSha256,
-                })
-                : await qemuService.verifyDiskSize({
-                    workdirectory: this.config.workdirectory,
-                    qcow2Name,
-                    expectedSizeBytes,
-                });
-            if (!verify.ok) {
-                if (verify.error === 'disk not found') {
-                    this.multicastClient.clientinfo.localVMHost = null;
-                    this.multicastClient.clientinfo.localVMState = 'missing';
-                } else {
-                    this.multicastClient.clientinfo.localVMHost = null;
-                    this.multicastClient.clientinfo.localVMState = 'error';
-                }
-                return { allowStart: false };
-            }
-            if (!verify.match) {
-                const mismatch = expectedSha256 ? 'hash mismatch' : 'size mismatch';
-                log.warn(`communicationhandler @ runLocalVmPreStartVerify: ${mismatch} for ${qcow2Name}`);
-                this.multicastClient.clientinfo.localVMHost = null;
-                this.multicastClient.clientinfo.localVMState = 'hash_mismatch';
-                return { allowStart: false };
-            }
-            if (expectedSha256) {
-                log.info(`communicationhandler @ runLocalVmPreStartVerify: hash OK for ${qcow2Name}`);
-            } else {
-                log.info(`communicationhandler @ runLocalVmPreStartVerify: size OK for ${qcow2Name} (actualBytes=${verify.actual}, expectedBytes=${expectedSizeBytes})`);
-            }
-            return { allowStart: true };
-        } catch (e) {
-            log.error('communicationhandler @ runLocalVmPreStartVerify', e);
-            this.multicastClient.clientinfo.localVMHost = null;
-            this.multicastClient.clientinfo.localVMState = 'error';
-            return { allowStart: false };
-        }
-    }
-
-    async preflightLocalVm(serverstatus, effectiveSection) {
-        const examSection = serverstatus.examSections[effectiveSection];
-        const { group, vmConfig, display } = pickLocalVmGroupConfig(
-            examSection,
-            this.multicastClient.clientinfo.name
-        );
-        this.multicastClient.clientinfo.group = group;
-
-        const qcow2Name = vmConfig.qcow2Name;
-        const vncPort = Number(vmConfig.vncPort || 5901);
-        const calculateSha256 = vmConfig.calculateSha256 === true;
-        const expectedSha256 = calculateSha256 ? vmConfig.qcow2Sha256 : null;
-        const expectedSizeBytes = !calculateSha256 ? vmConfig.qcow2SizeBytes : null;
-        const blockInternet = !!vmConfig.blockInternet;
-
-        this.multicastClient.clientinfo.examtype = 'localvm';
-        this.multicastClient.clientinfo.localVMHost = null;
-        this.multicastClient.clientinfo.localVMPort = vncPort;
-        this.notifyLocalVmCompatCheckEnd();
-
-        log.info(`communicationhandler @ preflightLocalVm: cfg (disk=${qcow2Name || '-'}, port=${vncPort}, display=${display.id}, blockInternet=${blockInternet}, calcHash=${calculateSha256}, hasHash=${!!expectedSha256}, hasSize=${typeof expectedSizeBytes === 'number'})`);
-
-        if (!qcow2Name) {
-            this.multicastClient.clientinfo.localVMState = 'missing';
-            return { allowStart: false };
-        }
-        if (calculateSha256 && !expectedSha256) {
-            log.error('communicationhandler @ preflightLocalVm: calculateSha256 enabled but qcow2Sha256 missing');
-            this.multicastClient.clientinfo.localVMState = 'error';
-            return { allowStart: false };
-        }
-        if (!calculateSha256 && (typeof expectedSizeBytes !== 'number' || !Number.isFinite(expectedSizeBytes) || expectedSizeBytes <= 0)) {
-            log.error('communicationhandler @ preflightLocalVm: calculateSha256 disabled but qcow2SizeBytes missing');
-            this.multicastClient.clientinfo.localVMState = 'error';
-            return { allowStart: false };
-        }
-
-        this.multicastClient.clientinfo.localVMState = 'verifying_hash';
-        const verifyRes = await this.runLocalVmPreStartVerify(qcow2Name, expectedSha256, calculateSha256 ? null : Number(expectedSizeBytes));
-        if (!verifyRes.allowStart) {
-            return { allowStart: false };
-        }
-
-        return {
-            allowStart: true,
-            qcow2Name,
-            vncPort,
-            overlayName: `${qcow2Name}.overlay.${this.multicastClient.clientinfo.servername || 'exam'}.${this.multicastClient.clientinfo.pin || '0'}.qcow2`,
-            blockInternet,
-            displayWidth: display.width,
-            displayHeight: display.height,
-        };
-    }
-
-    
-
-
 
     async requestUpdate(){
         syncClientDisplayInfo(this.multicastClient.clientinfo);
@@ -618,34 +447,15 @@ import {
         if (serverstatus.exammode && !this.multicastClient.clientinfo.exammode) {
             const lockedSection = Number(serverstatus.lockedSection || 1);
             const examtype = serverstatus?.examSections?.[lockedSection]?.examtype;
-            // startExam guards _endExamRunning/_startExamRunning itself; only the localvm state needs a pre-check here
-            if (examtype === 'localvm' && this.localVmStartState !== 'idle') {
-                log.debug(`communicationhandler @ processUpdatedServerstatus: localvm start suppressed (state=${this.localVmStartState})`);
-            } else if (examtype === 'localvm' && this._localVmAwaitingRetry()) {
-                // wait for localvm-retry-start after a failed preflight (qemu/disk)
-            } else {
-                log.info("communicationhandler @ processUpdatedServerstatus: exammode activated");
-                WindowHandler.closeExitQuestion();  // server decides state while connected: drop the post-exam quit dialog and restart immediately
-                this.killScreenlock();
-                this.startExam(serverstatus);
-            }
+            log.info("communicationhandler @ processUpdatedServerstatus: exammode activated");
+            WindowHandler.closeExitQuestion();  // server decides state while connected: drop the post-exam quit dialog and restart immediately
+            this.killScreenlock();
+            this.startExam(serverstatus);
         }
         else if (!serverstatus.exammode && this.multicastClient.clientinfo.exammode){
             log.info("communicationhandler @ processUpdatedServerstatus: exammode deactivated");
             this.killScreenlock();
             this.endExam(serverstatus);
-        }
-
-        if (!serverstatus.exammode && this.multicastClient.clientinfo.examtype === 'localvm') {
-            const st = this.multicastClient.clientinfo.localVMState;
-            if (st) {
-                log.info(`communicationhandler @ processUpdatedServerstatus: localvm exammode off -> clearing transient vm state (${st})`);
-                this.multicastClient.clientinfo.localVMState = null;
-                this.multicastClient.clientinfo.localVMHost = null;
-            }
-            if (this.localVmStartState !== 'idle') {
-                this.localVmStartState = 'idle';
-            }
         }
     }
 
@@ -902,125 +712,11 @@ import {
         });
     }
 
-     /** Stop LocalVM + VNC proxy when leaving a localvm section (section switch, not full endExam). */
-     async stopLocalVmIfActive() {
-         const localVmActive = this.multicastClient.clientinfo.examtype === 'localvm'
-             || this.multicastClient.clientinfo.localVMState === 'running';
-         if (!localVmActive) return;
-         stopProxy();
-         try {
-             log.info('communicationhandler @ stopLocalVmIfActive: requesting VM shutdown');
-             await qemuService.stopVmAsync({ graceful: true, shutdownTimeoutMs: 8000, killTimeoutMs: 8000 });
-         } catch (e) {
-             log.warn('communicationhandler @ stopLocalVmIfActive: graceful shutdown failed, killing VM');
-             await qemuService.stopVmAsync({ graceful: false, killTimeoutMs: 8000 });
-         }
-         try {
-             await qemuService.killAllLocalQemu(this.config.workdirectory);
-         } catch (e) {
-             log.warn('communicationhandler @ stopLocalVmIfActive: killAllLocalQemu sweep', e);
-         }
-         this.multicastClient.clientinfo.localVMHost = null;
-         this.multicastClient.clientinfo.localVMState = null;
-     }
-
-    /** QEMU preflight + start for LocalVM; sectionSwitch keeps exammode on recoverable failures. */
-    async bootLocalVmExamSection(serverstatus, effectiveSection, { sectionSwitch = false } = {}) {
-        if (this.localVmStartState !== 'idle') {
-            log.info(`communicationhandler @ bootLocalVmExamSection: suppressed (state=${this.localVmStartState})`);
-            return sectionSwitch;
-        }
-        this.localVmStartState = 'starting';
-        if (!sectionSwitch) this.notifyLocalVmCompatCheckStart();
-        let qemuResult = { ok: false, check: {} };
-        try {
-            qemuResult = await this.ensureQemuAvailableForLocalVm();
-        } finally {
-            if (!qemuResult.ok && !sectionSwitch) this.notifyLocalVmCompatCheckEnd();
-        }
-        if (!qemuResult.ok) {
-            if (!sectionSwitch) {
-                this.multicastClient.clientinfo.exammode = false;
-                this.multicastClient.clientinfo.localVMState = 'error';
-            }
-            this.localVmStartState = 'idle';
-            try {
-                WindowHandler.mainwindow?.webContents?.send('qemu-not-available', qemuResult.check || {});
-            } catch (e) {
-                log.debug('communicationhandler @ bootLocalVmExamSection: qemu-not-available send failed', e?.message);
-            }
-            return sectionSwitch;
-        }
-        try {
-            let preflight = null;
-            try {
-                preflight = await this.preflightLocalVm(serverstatus, effectiveSection);
-            } catch (e) {
-                log.error('communicationhandler @ bootLocalVmExamSection: preflightLocalVm failed', e);
-                this.multicastClient.clientinfo.localVMState = 'error';
-                if (!sectionSwitch) this.multicastClient.clientinfo.exammode = false;
-                this.localVmStartState = 'idle';
-                return sectionSwitch;
-            }
-            if (!preflight?.allowStart) {
-                if (!sectionSwitch) this.multicastClient.clientinfo.exammode = false;
-                this.localVmStartState = 'idle';
-                return sectionSwitch;
-            }
-            try {
-                await qemuService.startHeadless({
-                    workdirectory: this.config.workdirectory,
-                    examdirectory: this.config.examdirectory,
-                    qcow2Name: preflight.qcow2Name,
-                    vncDisplay: ':1',
-                    overlayName: preflight.overlayName,
-                    blockInternet: preflight.blockInternet,
-                    forceFreshOverlay: true,
-                    displayWidth: preflight.displayWidth,
-                    displayHeight: preflight.displayHeight,
-                });
-                this.multicastClient.clientinfo.localVMHost = '127.0.0.1';
-                this.multicastClient.clientinfo.localVMPort = Number(preflight.vncPort) || 5901;
-                this.multicastClient.clientinfo.localVMState = 'running';
-            } catch (e) {
-                log.error('communicationhandler @ bootLocalVmExamSection: qemu start failed', e);
-                this.multicastClient.clientinfo.localVMHost = null;
-                this.multicastClient.clientinfo.localVMState = 'error';
-                if (!sectionSwitch) this.multicastClient.clientinfo.exammode = false;
-                this.localVmStartState = 'idle';
-                if (e?.code === 'virt-disabled') {
-                    try {
-                        const install = getQemuInstallInfo();
-                        WindowHandler.mainwindow?.webContents?.send('qemu-not-available', {
-                            reason: 'virt-disabled',
-                            downloadUrl: install.downloadUrl,
-                            installHint: install.installHint,
-                        });
-                    }
-                    catch (err) { log.debug('communicationhandler @ bootLocalVmExamSection: virt-disabled notify failed', err?.message); }
-                }
-                return sectionSwitch;
-            }
-            this.localVmStartState = 'idle';
-            return true;
-        } catch (e) {
-            this.localVmStartState = 'idle';
-            throw e;
-        }
-    }
-
     /** Re-route mainwindow to another exam section while exammode is already active. */
     async rerouteExamSection(serverstatus) {
         const effectiveSection = this.multicastClient.clientinfo.lockedSection;
         const examtype = serverstatus.examSections[effectiveSection].examtype;
         log.info(`communicationhandler @ rerouteExamSection: section ${effectiveSection} examtype ${examtype}`);
-        if (examtype === 'localvm') {
-            const canRoute = await this.bootLocalVmExamSection(serverstatus, effectiveSection, { sectionSwitch: true });
-            if (!canRoute) {
-                log.warn('communicationhandler @ rerouteExamSection: localvm boot blocked');
-                return;
-            }
-        }
         if (!(await this.ensureAssessmentForExamStart())) return;
         await WindowHandler.rerouteToExamSection(examtype, this.multicastClient.clientinfo.token, serverstatus);
         if (examtype === 'microsoft365' && !this.multicastClient.clientinfo.msofficeshare) return; // no share link yet: loadExamRouteAndGuards reset exammode → next tick startExam retries
@@ -1065,23 +761,6 @@ import {
 
             const examtype = serverstatus.examSections[effectiveSection].examtype;
 
-            // LocalVM must run preflight BEFORE exammode and BEFORE opening the exam window.
-            if (examtype === 'localvm') {
-                if (this.multicastClient.clientinfo.exammode) {
-                    log.warn('communicationhandler @ startExam: localvm requested but exammode already active');
-                    return;
-                }
-                const bootOk = await this.bootLocalVmExamSection(serverstatus, effectiveSection);
-                if (!bootOk) return;
-                if (!(await this.ensureAssessmentForExamStart())) {
-                    this.localVmStartState = 'blocked';
-                    return;
-                }
-                log.info("communicationhandler @ startExam: initializing localvm exam")
-                this._snapshotExamStartIp()
-                await WindowHandler.createExamWindow(examtype, this.multicastClient.clientinfo.token, serverstatus);
-                return;
-            }
 
             if (!(await this.ensureAssessmentForExamStart())) return;
 
@@ -1204,8 +883,6 @@ import {
         }
         this._endExamRunning = true;
         try {
-        const localVmExam = this.multicastClient.clientinfo.examtype === 'localvm'
-            || this.multicastClient.clientinfo.localVMState === 'running';
         this.clearBipSiteInfo()
 
         if (WindowHandler.examServerstatus) {
@@ -1240,9 +917,6 @@ import {
 
         await stopAssessmentSession()
 
-        // final LocalVM share pull now; a later sync would re-download files into the cleaned folder
-        if (localVmExam) await qemuService.stopShareSync({ finalSync: true })
-
         // delete students work on students pc (makes sense if exam is written on school property)
         if (serverstatus && serverstatus.delfolderonexit === true){
             log.info("communicationhandler @ endExam: cleaning exam workfolder on exit")
@@ -1259,23 +933,6 @@ import {
         this.multicastClient.clientinfo.msofficeshare = false
         this.multicastClient.clientinfo.focus = true
         this.multicastClient.clientinfo.localLockdown = false;
-
-        // stop VNC proxy + shutdown VM after window teardown (LocalVM only)
-        if (localVmExam) {
-            stopProxy();
-            try {
-                log.info('communicationhandler @ endExam: requesting VM shutdown');
-                await qemuService.stopVmAsync({ graceful: true, shutdownTimeoutMs: 8000, killTimeoutMs: 8000 });
-            } catch (e) {
-                log.warn('communicationhandler @ endExam: shutdown failed, killing VM');
-                await qemuService.stopVmAsync({ graceful: false, killTimeoutMs: 8000 });
-            }
-            try {
-                await qemuService.killAllLocalQemu(this.config.workdirectory);
-            } catch (e) {
-                log.warn('communicationhandler @ endExam: killAllLocalQemu sweep', e);
-            }
-        }
 
         if (languageToolServer.languageToolProcess){
             languageToolServer.stopServer(); // Kill LanguageTool server when exam window is closed
@@ -1439,11 +1096,6 @@ import {
         //send save trigger to exam window
         const examWin = this.multicastClient.clientinfo.exammode ? WindowHandler.mainWin() : null;
         if (examWin){
-            // localvm has no renderer-side save flow; send ZIP directly
-            if (this.multicastClient?.clientinfo?.examtype === 'localvm') {
-                this.sendToTeacher()
-                return
-            }
             try {
                 examWin.webContents.send('save','teacherrequest')
             }
@@ -1472,7 +1124,6 @@ import {
 
         let base64File = null
         try {
-            await qemuService.syncShareNow()   // LocalVM: pull guest share first (no-op otherwise)
             await this.zipDirectory(this.config.examdirectory, zipfilepath)
             const fileContent = fs.readFileSync(zipfilepath);
             base64File = fileContent.toString('base64');

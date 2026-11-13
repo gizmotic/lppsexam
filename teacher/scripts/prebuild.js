@@ -54,8 +54,7 @@ const config = {
         editor: ${process.env.EXAMMODE_EDITOR === 'true'},
         math: ${process.env.EXAMMODE_MATH === 'true'},
         microsoft365: ${process.env.EXAMMODE_MICROSOFT365 === 'true'},
-        activesheets: ${process.env.EXAMMODE_ACTIVESHEETS === 'true'},
-        localvm: ${process.env.EXAMMODE_LOCALVM === 'true'}
+        activesheets: ${process.env.EXAMMODE_ACTIVESHEETS === 'true'}
     },
 
     exposeStudents: false,

@@ -71,47 +71,6 @@ router.post('/download/:servername', async (req, res, next) => {
     return res.zip({ files })
 })
 
-/**
- * Download a QEMU qcow2 disk from teacher workdir/QEMU (POST + Bearer student token; body.filename).
- */
-router.post('/qemu/:servername', async (req, res) => {
-    const servername = req.params.servername
-    const studenttoken = bearerTokenFromRequest(req)
-    const filenameRaw = req.body?.filename
-    const mcServer = config.examServerList[servername]
-    if (!mcServer) { return res.status(404).json({ status: "error", sender: "server", message: "server not found" }) }
-    if (!studenttoken) { return res.status(401).json({ status: t("data.tokennotvalid") }) }
-    if (!checkToken(studenttoken, mcServer)) { return res.status(403).json({ status: t("data.tokennotvalid") }) }
-
-    const filename = path.basename(String(filenameRaw || ''))
-    if (!filename || filename !== String(filenameRaw || '')) {
-        return res.status(400).json({ status: "error", sender: "server", message: "invalid filename" })
-    }
-    if (!filename.toLowerCase().endsWith('.qcow2')) {
-        return res.status(400).json({ status: "error", sender: "server", message: "invalid file type" })
-    }
-
-    const qemuDir = path.join(config.workdirectory, 'QEMU')
-    const resolvedDir = path.resolve(qemuDir)
-    const filePath = path.resolve(path.join(qemuDir, filename))
-    if (!filePath.startsWith(resolvedDir + path.sep)) {
-        return res.status(400).json({ status: "error", sender: "server", message: "invalid path" })
-    }
-
-    try {
-        await fs.promises.access(filePath, fs.constants.R_OK)
-    } catch (e) {
-        return res.status(404).json({ status: "error", sender: "server", message: "file not found" })
-    }
-
-    res.setHeader('Content-disposition', 'attachment; filename=' + filename)
-    return res.download(filePath)
-})
-
-
-
-
-
 router.post('/getexammaterials/:servername', async (req, res, next) => {
     const servername = req.params.servername
     const mcServer = config.examServerList[servername]

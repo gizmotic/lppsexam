@@ -576,7 +576,7 @@ class WindowHandler {
             this.returnToStudentView();
         }
         // just to be sure we check some important vars here
-        if (examtype !== "rdp" && examtype !== "website" &&  examtype !== "forms" && examtype !== "eduvidual" && examtype !== "editor" && examtype !== "math" && examtype !== "microsoft365" && examtype !== "activesheets" && examtype !== "localvm" || !token){  // for now.. we probably should stop everything here
+        if (examtype !== "rdp" && examtype !== "website" &&  examtype !== "forms" && examtype !== "eduvidual" && examtype !== "editor" && examtype !== "math" && examtype !== "microsoft365" && examtype !== "activesheets" || !token){  // for now.. we probably should stop everything here
             log.warn("missing parameters for exam-mode or mode not in allowed list!");
             examtype = "editor";
         }
@@ -673,7 +673,7 @@ class WindowHandler {
                 await this.navigateToExamRoute(win, this.buildExamHashRoute(examtype, token, serverstatus, options), options)
             }
 
-            const examTypesWithPdfInHeader = ["forms", "website", "eduvidual", "editor", "rdp", "microsoft365", "activesheets", "math", "localvm"];
+            const examTypesWithPdfInHeader = ["forms", "website", "eduvidual", "editor", "rdp", "microsoft365", "activesheets", "math"];
             const effectiveSection = serverstatus.allowSectionSwitch ? this.multicastClient.clientinfo.lockedSection : serverstatus.lockedSection;
             if (examTypesWithPdfInHeader.includes(serverstatus.examSections[effectiveSection].examtype)) {
                 win.webContents.on('will-navigate', (event, url) => {

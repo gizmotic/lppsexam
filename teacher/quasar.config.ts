@@ -381,7 +381,7 @@ export default defineConfig(( ctx: any ) => {
           category: 'Utility',
           icon: 'public/icons/256x256.png',
           artifactName: artifactNamePattern,
-          files: ['**/*', '!public/qemu/win/**', '!public/qemu/mac/**'],
+          files: ['**/*'],
         },
         mac: {
           icon: 'public/icons/icon.png',
@@ -392,7 +392,7 @@ export default defineConfig(( ctx: any ) => {
           entitlementsInherit: 'scripts/entitlements.mac.plist',
           category: 'public.app-category.utilities',
           target: { target: 'dmg', arch: macEbArch },
-          files: ['**/*', '!public/qemu/win/**', '!public/qemu/lin/**'],
+          files: ['**/*'],
         },
         dmg: { sign: false },
         portable: { useZip: false, unpackDirName: 'next-exam-teacher', splashImage: 'public/splash.bmp' },
@@ -407,7 +407,7 @@ export default defineConfig(( ctx: any ) => {
           icon: 'public/icons/icon.ico',
           target: winEbTarget,
           artifactName: artifactNamePattern,
-          files: ['**/*', '!public/qemu/win/**', '!public/qemu/lin/**', '!public/qemu/mac/**'],
+          files: ['**/*'],
           // SIGN env (SIGN !== 'false'): signExecutable gates signing; Azure Trusted Signing auth comes from AZURE_* env vars (OIDC in CI)
           signExecutable: signEnabled,
           // electron-builder only warns on signing failures; fail the build instead of shipping unsigned artifacts

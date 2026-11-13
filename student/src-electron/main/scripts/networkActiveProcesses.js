@@ -22,10 +22,6 @@ const LT_MARKERS = ['languagetool-server.jar', 'org.languagetool.server'];
 // LT default listen port; conflict detection uses ltServer.port when set
 const LT_DEFAULT_PORT = 8088;
 
-// Next-Exam owned helper markers; cmdline-based safety net for processes that may
-// outlive the main process (e.g. orphaned after dev HMR / unclean shutdown) and
-// therefore escape PID-tree exclusion.
-const NEXT_EXAM_CMDLINE_MARKERS = ['vncproxy-helper.cjs'];
 
 // Minimal allowlist; OS-critical + benign Windows/school-background (basename match, case-insensitive).
 const SYSTEM_CRITICAL_NAMES = new Set([
@@ -440,7 +436,6 @@ export async function getNetworkActiveProcesses(opts = {}) {
         const cmd = r.cmdline || '';
         const cmdLower = cmd.toLowerCase();
         if (extras.some((sub) => cmdLower.includes(sub))) continue;
-        if (NEXT_EXAM_CMDLINE_MARKERS.some((m) => cmdLower.includes(m))) continue;
         if (isSysCritical(r.name)) continue;
         if (isLt(cmd, r.exe)) continue;
 

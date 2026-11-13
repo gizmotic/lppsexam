@@ -57,11 +57,7 @@ export async function updateRemoteAssistant(clientinfo, opts = {}) {
     }
 
     const keywordHits = keywordHit ? keywordHit.keywords : [];
-    // localvm owns VNC :5901 — drop that port hit so QEMU does not look like remote assist
-    let ports = keywordHit?.ports?.length ? keywordHit.ports : [];
-    if (clientinfo.examtype === 'localvm') {
-        ports = ports.filter((p) => Number(p) !== 5901);
-    }
+    const ports = keywordHit?.ports?.length ? keywordHit.ports : [];
 
     if (keywordHits.length || ports.length) {
         const prevKeywords = clientinfo.remoteassistant?.keywords || [];

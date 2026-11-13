@@ -333,7 +333,6 @@ export default {
                 case 'activesheets': return 'Active Sheets'
                 case 'microsoft365': return this.$t('dashboard.microsoft365')
                 case 'rdp': return 'RDP'
-                case 'localvm': return 'LocalVM'
                 default: return examtype || '–'
             }
         },

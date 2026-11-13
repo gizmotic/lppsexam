@@ -10,7 +10,7 @@ env:
 
 jobs:
   # UI (vite/esbuild) built on cheap ubuntu runner; macOS job only packages/signs/notarizes.
-  # UnPackaged is transferred as tar because upload-artifact strips executable bits (JRE/qemu binaries in public/).
+  # UnPackaged is transferred as tar because upload-artifact strips executable bits (JRE binaries in public/).
   student-ui:
     runs-on: ubuntu-latest
     timeout-minutes: 60

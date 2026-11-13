@@ -489,10 +489,6 @@ export default defineConfig(( ctx: any ) => {
         extraResources: [
           { from: 'src-electron/resources/linux', to: 'linux' },
           { from: 'src-electron/resources/win32', to: 'win32' },
-          // vncproxy-helper runs as a plain node process (ELECTRON_RUN_AS_NODE) -> cannot require from app.asar;
-          // ship it + its only dep (ws, pure JS) unpacked so require('ws') resolves next to the helper
-          { from: 'src-electron/main/scripts/vncproxy-helper.cjs', to: 'vncproxy/vncproxy-helper.cjs' },
-          { from: 'node_modules/ws', to: 'vncproxy/node_modules/ws' },
           // assessment-helper.app = .app bundle (embedded profile authorizes restricted AAC entitlement); wifi-helper = plain CLI
           ...['assessment-helper.app', 'wifi-helper']
             .filter((name) => fse.existsSync(path.join(__dirname, 'scripts/apple', name)))
@@ -508,7 +504,7 @@ export default defineConfig(( ctx: any ) => {
           icon: 'public/icons/256x256.png',
           artifactName: artifactNamePattern,
           // Quasar UnPackaged root has electron-main.js, index.html, preload/, assets/ – include all, exclude other platforms’ JRE
-          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!public/qemu/win/**', '!public/qemu/mac/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes],
+          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes],
         },
         mac: {
           icon: 'public/icons/icon.png',
@@ -519,7 +515,7 @@ export default defineConfig(( ctx: any ) => {
           entitlementsInherit: 'scripts/entitlements.mac.plist',
           category: 'public.app-category.utilities',
           target: { target: 'dmg', arch: macEbArch },
-          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-lin/**', '!public/qemu/win/**', '!public/qemu/lin/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes],
+          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-lin/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes],
         },
         dmg: { sign: false },
         portable: { useZip: true, unpackDirName: 'next-exam-student', splashImage: 'public/splash.bmp' },
@@ -534,7 +530,7 @@ export default defineConfig(( ctx: any ) => {
           icon: 'public/icons/icon.ico',
           target: winEbTarget,
           artifactName: artifactNamePattern,
-          files: ['**/*', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!public/minimal-jre-11-lin/**', '!public/qemu/win/**', '!public/qemu/lin/**', '!public/qemu/mac/**', ...rendererOnlyAsarExcludes],
+          files: ['**/*', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!public/minimal-jre-11-lin/**', ...rendererOnlyAsarExcludes],
           // SIGN env (SIGN !== 'false'): signAndEditExecutable gates signing; Azure Trusted Signing auth comes from AZURE_* env vars (OIDC in CI)
           signAndEditExecutable: signEnabled,
           // electron-builder only warns on signing failures; fail the build instead of shipping unsigned artifacts

@@ -9,32 +9,15 @@ export function isNxe1ExamEncrypted(buf) {
     return b.length >= 5 && b.subarray(0, 4).toString('ascii') === 'NXE1' && b.readUInt8(4) === 1;
 }
 
-/** Section index nur fuer den localvm-examtype-check (canDecryptStudentNxE1) - NICHT die student lockedSection logic. */
-export function effectiveSectionIndex(serverstatus) {
-    if (!serverstatus) return 1;
-    const idx = serverstatus.allowSectionSwitch && serverstatus.lockedSection != null
-        ? serverstatus.lockedSection
-        : serverstatus.activeSection;
-    return idx != null ? idx : 1;
-}
-
-/** Returns true when the active section exam type is localvm (student work files not NXE1-encrypted). */
-export function isLocalVmServerstatus(serverstatus) {
-    if (!serverstatus?.examSections) return false;
-    const idx = effectiveSectionIndex(serverstatus);
-    return serverstatus.examSections[idx]?.examtype === 'localvm';
-}
-
 /** Returns trimmed NXE1 encryption secret from serverstatus (auto-generated hex string). */
 export function encryptionPasswordFromStatus(serverstatus) {
     return String(serverstatus?.encryptionPassword ?? '').trim();
 }
 
-/** True when we can decrypt NXE1 payloads from students (encryption secret set, not localvm exam type). */
+/** True when we can decrypt NXE1 payloads from students (encryption secret set). */
 export function canDecryptStudentNxE1(mcServer) {
     const s = mcServer?.serverstatus;
     if (!s) return false;
-    if (isLocalVmServerstatus(s)) return false;
     return encryptionPasswordFromStatus(s).length > 0;
 }
 

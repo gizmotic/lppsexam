@@ -41,15 +41,6 @@ import { isAssessmentSessionActive } from './assessmentSession.js';
 import { updateSystemTray } from './traymenu.js';
 import { getWlanInfo } from './getwlaninfo.js';
 import { switchExamSection, isSectionSwitchRunning } from './switchExamSection.js';
-import { startProxy, stopProxy } from './vncproxy.js';
-import qemuService from './qemuService.js';
-import {
-    checkQemuAvailability,
-    getQemuInstallInfo,
-    getWindowsHypervisorPlatformState,
-    requestEnableWindowsHypervisorPlatform,
-} from '../../../../shared/qemuAvailability.js';
-import { pickLocalVmGroupConfig } from '../../../../shared/localVmDisplayResolutions.js';
 import { getVMFindings } from './vmDetection.js';
 import { decryptExamFileAllLayersAsync, encryptExamFileBytes, isExamFileEncryptedBytes } from './examFileCrypto.js';
 import { examApiFetch } from './examApiFetch.js';
@@ -152,9 +143,9 @@ const resolveExamDecryptPassword = (multicastClient) => {
     return '';
 };
 
-/** Plaintext in the examdir is only legit in localvm (VM reads the share) or while no exam key is known. */
+/** Plaintext in the examdir is only legit while no exam key is known. */
 const examRequiresEncryption = (multicastClient) =>
-    multicastClient?.clientinfo?.examtype !== 'localvm' && !!resolveExamDecryptPassword(multicastClient);
+    !!resolveExamDecryptPassword(multicastClient);
 
 /**
  * Reads an examdir file and returns plaintext. Rejects plaintext files (e.g. placed by the student before
@@ -450,260 +441,6 @@ class IpcHandler {
             i18n.locale = locale
             updateSystemTray(i18n.locale);
         })
-
-        ipcMain.handle('start-proxy', async (event, payload) => {
-            try {
-                const { host, port } = payload || {};
-                if (!host || !port) {
-                    throw new Error('Invalid proxy target');
-                }
-                const result = await startProxy({ host, port });
-                return { port: result };
-            } catch (err) {
-                log.error('ipchandler @ start-proxy:', err);
-                return { port: null, error: err.message };
-            }
-        });
-
-        // shut down the VNC proxy helper from renderer (e.g. localvmview beforeUnmount)
-        ipcMain.handle('stop-proxy', async () => {
-            try {
-                stopProxy();
-                return { ok: true };
-            } catch (err) {
-                log.error('ipchandler @ stop-proxy:', err);
-                return { ok: false, error: err.message };
-            }
-        });
-
-        ipcMain.handle('qemu-check-available', async (_event, opts = {}) => {
-            try {
-                return await checkQemuAvailability(opts);
-            } catch (e) {
-                log.error('ipchandler @ qemu-check-available', e);
-                const install = getQemuInstallInfo();
-                return {
-                    ok: false,
-                    missing: ['qemu-system-x86_64', 'qemu-img'],
-                    downloadUrl: install.downloadUrl,
-                    installHint: install.installHint,
-                };
-            }
-        });
-
-        ipcMain.handle('qemu-open-install-page', async () => {
-            try {
-                const { downloadUrl } = getQemuInstallInfo();
-                await shell.openExternal(downloadUrl);
-                return { ok: true };
-            } catch (e) {
-                log.error('ipchandler @ qemu-open-install-page', e);
-                return { ok: false, error: String(e?.message || e) };
-            }
-        });
-
-        ipcMain.handle('qemu-check-hypervisor-platform', async () => {
-            try {
-                return await getWindowsHypervisorPlatformState();
-            } catch (e) {
-                log.error('ipchandler @ qemu-check-hypervisor-platform', e);
-                return { supported: false, enabled: false, state: 'error' };
-            }
-        });
-
-        ipcMain.handle('qemu-request-enable-hypervisor-platform', async () => {
-            try {
-                return requestEnableWindowsHypervisorPlatform();
-            } catch (e) {
-                log.error('ipchandler @ qemu-request-enable-hypervisor-platform', e);
-                return { ok: false, error: String(e?.message || e) };
-            }
-        });
-
-        ipcMain.handle('qemu-start-headless', async (_event, payload = {}) => {
-            try {
-                const avail = await checkQemuAvailability();
-                if (!avail.ok) {
-                    log.warn('ipchandler @ qemu-start-headless: QEMU not available', avail.missing);
-                    return { ok: false, qemuMissing: true, missing: avail.missing };
-                }
-                const { qcow2Name, vncPort, overlayName, blockInternet, expectedSha256, expectedSizeBytes, forceFreshOverlay } = payload || {};
-                const effectiveSection = this.multicastClient?.clientinfo?.lockedSection
-                    || this.multicastClient?.serverstatus?.lockedSection
-                    || this.multicastClient?.serverstatus?.activeSection
-                    || 1;
-                const examSection = this.multicastClient?.serverstatus?.examSections?.[effectiveSection];
-                const { display } = pickLocalVmGroupConfig(examSection, this.multicastClient?.clientinfo?.name);
-                const displayWidth = Number(payload?.displayWidth) > 0 ? Number(payload.displayWidth) : display.width;
-                const displayHeight = Number(payload?.displayHeight) > 0 ? Number(payload.displayHeight) : display.height;
-                log.info(`ipchandler @ qemu-start-headless: start requested (disk=${qcow2Name}, port=${vncPort}, display=${displayWidth}x${displayHeight}, blockInternet=${!!blockInternet}, hasHash=${!!expectedSha256}, hasSize=${typeof expectedSizeBytes === 'number'})`);
-                const vncDisplay = Number(vncPort) === 5901 ? ':1' : ':1';
-                if (this.multicastClient?.clientinfo) {
-                    this.multicastClient.clientinfo.localVMHost = null;
-                    this.multicastClient.clientinfo.localVMPort = Number(vncPort) || 5901;
-                    this.multicastClient.clientinfo.localVMState = (expectedSha256 || expectedSizeBytes) ? 'verifying_hash' : 'starting';
-                }
-                if (expectedSha256 || expectedSizeBytes) {
-                    if (!this.CommunicationHandler?.runLocalVmPreStartVerify) {
-                        throw new Error('runLocalVmPreStartVerify unavailable');
-                    }
-                    const pre = await this.CommunicationHandler.runLocalVmPreStartVerify(qcow2Name, expectedSha256 || null, expectedSha256 ? null : expectedSizeBytes);
-                    if (!pre.allowStart) {
-                        log.warn(`ipchandler @ qemu-start-headless: pre-start verify blocked start for ${qcow2Name}`);
-                        return { ok: false, error: 'localvm hash verify failed or disk missing' };
-                    }
-                }
-                const result = await qemuService.startHeadless({
-                    workdirectory: this.config.workdirectory,
-                    examdirectory: this.config.examdirectory,
-                    qcow2Name,
-                    vncDisplay,
-                    overlayName,
-                    blockInternet: !!blockInternet,
-                    forceFreshOverlay: !!forceFreshOverlay,
-                    displayWidth,
-                    displayHeight,
-                });
-                if (this.multicastClient?.clientinfo) {
-                    this.multicastClient.clientinfo.localVMHost = '127.0.0.1';
-                    this.multicastClient.clientinfo.localVMPort = Number(vncPort) || 5901;
-                    this.multicastClient.clientinfo.localVMState = (expectedSha256 || expectedSizeBytes) ? 'running' : 'unverified_hash';
-                }
-                return { ok: true, result };
-            } catch (err) {
-                log.error('ipchandler @ qemu-start-headless', err);
-                if (this.multicastClient?.clientinfo) {
-                    this.multicastClient.clientinfo.localVMHost = null;
-                    this.multicastClient.clientinfo.localVMState = 'error';
-                }
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
-
-        ipcMain.handle('qemu-stop', async () => {
-            try {
-                await qemuService.stopVmAsync({ graceful: true, shutdownTimeoutMs: 8000, killTimeoutMs: 8000 });
-                await qemuService.killAllLocalQemu(this.config.workdirectory);
-                return { ok: true };
-            } catch (err) {
-                log.error('ipchandler @ qemu-stop', err);
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
-
-        ipcMain.handle('qemu-reset-hard', async () => {
-            try {
-                const res = await qemuService.resetVmHard();
-                return { ok: true, result: res };
-            } catch (err) {
-                log.error('ipchandler @ qemu-reset-hard', err);
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
-
-        ipcMain.handle('qemu-pick-disk-file', async () => {
-            try {
-                const result = await dialog.showOpenDialog(this.WindowHandler.mainwindow, {
-                    properties: ['openFile'],
-                    filters: [{ name: 'QEMU Disk', extensions: ['qcow2'] }],
-                });
-                if (result.canceled || !result.filePaths?.[0]) {
-                    return { ok: false, cancelled: true };
-                }
-                return { ok: true, sourcePath: result.filePaths[0] };
-            } catch (err) {
-                log.error('ipchandler @ qemu-pick-disk-file', err);
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
-
-        ipcMain.handle('qemu-import-disk', async (_event, payload = {}) => {
-            try {
-                const sourcePath = payload?.sourcePath;
-                if (!sourcePath) {
-                    return { ok: false, error: 'invalid sourcePath' };
-                }
-                const sendProgress = (p) => {
-                    try { this.WindowHandler?.mainwindow?.webContents?.send?.('qemu-download-progress', p); } catch (e) {}
-                };
-                const importRes = await qemuService.importDisk({
-                    workdirectory: this.config.workdirectory,
-                    sourcePath,
-                    onProgress: sendProgress,
-                });
-                if (importRes?.ok && this.multicastClient?.serverstatus?.exammode) {
-                    if (this.CommunicationHandler.localVmStartState === 'starting') {
-                        log.info('ipchandler @ qemu-import-disk: localvm start already in progress, skip startExam');
-                    } else {
-                        if (this.CommunicationHandler.localVmStartState === 'blocked') {
-                            this.CommunicationHandler.localVmStartState = 'idle';
-                        }
-                        this.CommunicationHandler.startExam(this.multicastClient.serverstatus);
-                    }
-                }
-                return importRes;
-            } catch (err) {
-                log.error('ipchandler @ qemu-import-disk', err);
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
-
-        ipcMain.handle('localvm-retry-start', async () => {
-            try {
-                const serverstatus = this.multicastClient?.serverstatus;
-                if (!serverstatus?.exammode) {
-                    return { ok: false, error: 'exam not active' };
-                }
-                if (this.CommunicationHandler.localVmStartState === 'starting') {
-                    return { ok: false, error: 'start already in progress' };
-                }
-                this.CommunicationHandler.localVmStartState = 'idle';
-                this.multicastClient.clientinfo.localVMState = null;
-                this.multicastClient.clientinfo.localVMHost = null;
-                await this.CommunicationHandler.startExam(serverstatus);
-                return { ok: true };
-            } catch (err) {
-                log.error('ipchandler @ localvm-retry-start', err);
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
-
-        ipcMain.handle('qemu-download-disk', async (_event, payload = {}) => {
-            try {
-                const { serverip, serverApiPort, servername, studenttoken, filename, overwrite } = payload || {};
-                log.info(`ipchandler @ qemu-download-disk: downloading ${filename} from teacher ${servername}@${serverip}:${serverApiPort}`);
-                const sendProgress = (p) => {
-                    try { this.WindowHandler?.mainwindow?.webContents?.send?.('qemu-download-progress', p); } catch (e) {}
-                };
-                sendProgress({ phase: 'start', filename, percent: 0 });
-                const result = await qemuService.downloadDiskFromTeacher({
-                    serverip,
-                    serverApiPort,
-                    servername,
-                    studenttoken,
-                    filename,
-                    workdirectory: this.config.workdirectory,
-                    overwrite: !!overwrite,
-                    onProgress: sendProgress,
-                });
-                log.info(`ipchandler @ qemu-download-disk: download finished (skipped=${!!result?.skipped}) ${filename}`);
-                sendProgress({ phase: 'end', filename, percent: 100 });
-                if (this.multicastClient?.serverstatus?.exammode) {
-                    if (this.CommunicationHandler.localVmStartState === 'starting') {
-                        log.info('ipchandler @ qemu-download-disk: localvm start already in progress, skip startExam');
-                    } else {
-                        if (this.CommunicationHandler.localVmStartState === 'blocked') {
-                            this.CommunicationHandler.localVmStartState = 'idle';
-                        }
-                        this.CommunicationHandler.startExam(this.multicastClient.serverstatus);
-                    }
-                }
-                return { ok: true, result };
-            } catch (err) {
-                log.error('ipchandler @ qemu-download-disk', err);
-                return { ok: false, error: String(err?.message || err) };
-            }
-        });
 
         // True when hostname belongs to Microsoft Forms or its sign-in redirect chain.
         const isMicrosoftFormsNavigationHost = (hostname) => {
@@ -1086,7 +823,6 @@ class IpcHandler {
                                 math: {},
                                 microsoft365: {},
                                 rdp: {},
-                                localvm: {},
                             },
                         },
                         groupB: {
@@ -1102,7 +838,6 @@ class IpcHandler {
                                 math: {},
                                 microsoft365: {},
                                 rdp: {},
-                                localvm: {},
                             },
                         },
                     }

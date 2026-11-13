@@ -183,7 +183,6 @@
                 <li v-if="config.exammodes && config.exammodes.website"><a class="dropdown-item" data-e2e="exam-mode-website" @click="selectExamType('website')" :class="{ active: isExamType('website') }">Website</a></li>
                 <li v-if="config.exammodes && config.exammodes.microsoft365"><a class="dropdown-item" @click="selectExamType('microsoft365')" :class="{ active: isExamType('microsoft365') }">Microsoft365</a></li>
                 <li v-if="config.exammodes && config.exammodes.rdp"><a class="dropdown-item" @click="selectExamType('rdp')" :class="{ active: isExamType('rdp') }">RDP</a> </li>
-                <li v-if="config.exammodes && config.exammodes.localvm"><a class="dropdown-item" @click="selectExamType('localvm')" :class="{ active: isExamType('localvm') }">LocalVM</a> </li>
             </ul>
             </div>
      
@@ -634,72 +633,6 @@
                         </div>
                     </template>
                 </div>
-
-                <div v-if="isExamType('localvm')" class="basematerial-sidebar-block mt-3">
-                    <div class="basematerial-panel-caption">LocalVM (QEMU)</div>
-
-                    <template v-if="serverstatus.examSections[serverstatus.activeSection].groups">
-                        <div class="basematerial-row">
-                            <span class="basematerial-group-pill">A</span>
-                            <template v-if="serverstatus.examSections[serverstatus.activeSection].groupA?.examConfig?.localvm?.qcow2Name">
-                                <div class="btn-group basematerial-filegroup" role="group">
-                                    <button type="button" class="btn btn-sm btn-teal basematerial-filename text-truncate"
-                                        :title="serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.qcow2Name"
-                                        @click="configureLocalVM('a')">
-                                        <span class="basematerial-filename-truncate">{{ serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.qcow2Name }}</span>
-                                    </button>
-                                    <div v-if="serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.blockInternet" class="btn btn-sm btn-warning sd-sf-btn" title="Internet in der VM blockiert"><span class="sd-sf-stack">WEB</span></div>
-                                    <div v-if="serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.calculateSha256" class="btn btn-sm btn-warning sd-sf-btn" title="SHA256 Hash überprüfen aktiviert"><span class="sd-sf-stack">SHA</span></div>
-                                </div>
-                            </template>
-                            <button v-else type="button" class="btn btn-sm btn-outline-secondary sidebar-pick-btn" @click="configureLocalVM('a')">
-                                <span class="sidebar-pick-btn__label">QEMU VM wählen</span>
-                                <span class="sidebar-pick-btn__plus" aria-hidden="true">+</span>
-                            </button>
-                        </div>
-
-                        <div class="basematerial-row">
-                            <span class="basematerial-group-pill basematerial-group-pill--b">B</span>
-                            <template v-if="serverstatus.examSections[serverstatus.activeSection].groupB?.examConfig?.localvm?.qcow2Name">
-                                <div class="btn-group basematerial-filegroup" role="group">
-                                    <button type="button" class="btn btn-sm btn-teal basematerial-filename text-truncate"
-                                        :title="serverstatus.examSections[serverstatus.activeSection].groupB.examConfig.localvm.qcow2Name"
-                                        @click="configureLocalVM('b')">
-                                        <span class="basematerial-filename-truncate">{{ serverstatus.examSections[serverstatus.activeSection].groupB.examConfig.localvm.qcow2Name }}</span>
-                                    </button>
-                                    <div v-if="serverstatus.examSections[serverstatus.activeSection].groupB.examConfig.localvm.blockInternet" class="btn btn-sm btn-warning sd-sf-btn" title="Internet in der VM blockiert"><span class="sd-sf-stack">WEB</span></div>
-                                    <div v-if="serverstatus.examSections[serverstatus.activeSection].groupB.examConfig.localvm.calculateSha256" class="btn btn-sm btn-warning sd-sf-btn" title="SHA256 Hash überprüfen aktiviert"><span class="sd-sf-stack">SHA</span></div>
-                                </div>
-                            </template>
-                            <button v-else type="button" class="btn btn-sm btn-outline-secondary sidebar-pick-btn" @click="configureLocalVM('b')">
-                                <span class="sidebar-pick-btn__label">QEMU VM wählen</span>
-                                <span class="sidebar-pick-btn__plus" aria-hidden="true">+</span>
-                            </button>
-                        </div>
-                    </template>
-
-                    <template v-else>
-                        <div class="basematerial-row">
-                            <span class="basematerial-group-pill basematerial-group-pill--ab" aria-label="A/B">AB</span>
-                            <template v-if="serverstatus.examSections[serverstatus.activeSection].groupA?.examConfig?.localvm?.qcow2Name">
-                                <div class="btn-group basematerial-filegroup" role="group">
-                                    <button type="button" class="btn btn-sm btn-teal basematerial-filename text-truncate"
-                                        :title="serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.qcow2Name"
-                                        @click="configureLocalVM('all')">
-                                        <span class="basematerial-filename-truncate">{{ serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.qcow2Name }}</span>
-                                    </button>
-                                    <div v-if="serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.blockInternet" class="btn btn-sm btn-warning sd-sf-btn" title="Internet in der VM blockiert"><span class="sd-sf-stack">WEB</span></div>
-                                    <div v-if="serverstatus.examSections[serverstatus.activeSection].groupA.examConfig.localvm.calculateSha256" class="btn btn-sm btn-warning sd-sf-btn" title="SHA256 Hash überprüfen aktiviert"><span class="sd-sf-stack">SHA</span></div>
-                                </div>
-                            </template>
-                            <button v-else type="button" class="btn btn-sm btn-outline-secondary sidebar-pick-btn" @click="configureLocalVM('all')">
-                                <span class="sidebar-pick-btn__label">QEMU VM wählen</span>
-                                <span class="sidebar-pick-btn__plus" aria-hidden="true">+</span>
-                            </button>
-                        </div>
-                    </template>
-                </div>
-
 
                 <!-- Active Sheets: panel with group pills, filename, remove -->
                 <div v-if="isExamType('activesheets')" class="basematerial-sidebar-block mt-3">
@@ -1404,7 +1337,7 @@ import { handleDragEndItem, handleMoveItem, sortStudentWidgets, initializeStuden
 import { loadFilelist, getLatest, processPrintrequest,  loadImage, showPDFPreview, loadTextFile, loadHtmlFile, dashboardExplorerSendFile, downloadFile, showWorkfolder, fdelete,  openLatestFolder, printBase64, showBase64ImagePreview, showBase64PdfInRenderer, saveActivesheetsCorrectionTemplate, exportActivesheetsZip, saveActivesheetsCorrectedPdf, discardActivesheetsCorrectedPdf } from '../utils/filemanager'
 import { swalQueued } from '../utils/swalQueue.js'
 import { activateSpellcheckForStudent, delfolderquestion, stopserver, sendFiles, lockscreens, getFiles, startExam, lockSectionForAll, endExam, kick, kickAllOffline, restore } from '../utils/exammanagement.js'
-import { configureWebsite, configureEduvidual, configureForms, configureMicrosoft365Template, configureEditorTemplate, removeEditorTemplate, removeMicrosoft365Template, removeWebsiteUrl, removeEduvidualUrl, removeRdp, removeFormsUrl, setEditorExamConfigPatch, setMathExamConfigPatch, configureCustomLanguageToolHost, removeCustomLanguageToolHost, configureActivesheets, configureRDP, configureLocalVM, defineMaterials, handleAllowedUrlRemove, openAllowedUrl, addFileAsExamMaterial } from '../utils/examsetup.js'
+import { configureWebsite, configureEduvidual, configureForms, configureMicrosoft365Template, configureEditorTemplate, removeEditorTemplate, removeMicrosoft365Template, removeWebsiteUrl, removeEduvidualUrl, removeRdp, removeFormsUrl, setEditorExamConfigPatch, setMathExamConfigPatch, configureCustomLanguageToolHost, removeCustomLanguageToolHost, configureActivesheets, configureRDP, defineMaterials, handleAllowedUrlRemove, openAllowedUrl, addFileAsExamMaterial } from '../utils/examsetup.js'
 import { Exam } from '../types/api'
 import { openStudentEditorTimelineDiff } from '../utils/studentEditorTimeline.js'
 import { examApiFetch } from 'next-exam-shared/examApiFetch.js'
@@ -1553,8 +1486,8 @@ export default {
                         sectiondisabled: false,
                         sectionname: "Abschnitt 1",
                         groups: false,
-                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } },
-                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } }
+                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } },
+                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } }
                     },
                     2: {
                         examtype: 'math',
@@ -1563,8 +1496,8 @@ export default {
                         sectiondisabled: false,
                         sectionname: "Abschnitt 2",
                         groups: false,
-                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } },
-                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } }
+                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } },
+                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } }
                     },
                     3: {
                         examtype: 'math',
@@ -1573,8 +1506,8 @@ export default {
                         sectiondisabled: false,
                         sectionname: "Abschnitt 3",
                         groups: false,
-                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } },
-                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } }
+                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } },
+                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } }
                     },
                     4: {
                         examtype: 'math',
@@ -1583,8 +1516,8 @@ export default {
                         sectiondisabled: false,
                         sectionname: "Abschnitt 4",
                         groups: false,
-                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } },
-                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{}, localvm:{} } }
+                        groupA: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } },
+                        groupB: { users: [], examInstructionFiles: [], allowedUrls: [], examConfig: { activeSheets:{}, editor: { ...DEFAULT_EDITOR_EXAM_CONFIG }, eduvidual:{}, forms:{}, website:{}, math:{}, microsoft365:{}, rdp:{} } }
                     }
                 },                
             } as Exam
@@ -1742,15 +1675,6 @@ computed: {
                 const hasA = !!section.groupA?.examConfig?.forms?.url
                 const hasB = !!section.groupB?.examConfig?.forms?.url
                 return section.groups ? (hasA && hasB) : hasA
-            }
-            if (examType === 'localvm') {
-                const isOk = (cfg) => {
-                    if (!cfg || !cfg.qcow2Name) return false
-                    const wantsHash = cfg.calculateSha256 === true
-                    return wantsHash ? !!cfg.qcow2Sha256 : !!cfg.qcow2SizeBytes
-                }
-                if (!section.groups) return isOk(section.groupA?.examConfig?.localvm || {})
-                return isOk(section.groupA?.examConfig?.localvm || {}) && isOk(section.groupB?.examConfig?.localvm || {})
             }
             return true
         },
@@ -2025,7 +1949,6 @@ computed: {
         removeCustomLanguageToolHost: removeCustomLanguageToolHost,
         configureActivesheets: configureActivesheets,
         configureRDP: configureRDP,
-        configureLocalVM: configureLocalVM,
         defineMaterials: defineMaterials,             // define materials for exam
 
         handleAllowedUrlRemove: handleAllowedUrlRemove,
@@ -2349,7 +2272,6 @@ computed: {
             if (type === 'website') {/* configured via sidebar */}
             if (type === 'math') {/* no dialog */}
             if (type === 'rdp') {/* configured via sidebar */}
-            if (type === 'localvm') {/* configured via sidebar */}
         },
 
         // get label for the current exam type
@@ -2364,7 +2286,6 @@ computed: {
             case 'activesheets': return 'Active Sheets';
             case 'microsoft365': return this.$t('dashboard.microsoft365');
             case 'rdp': return 'RDP';
-            case 'localvm': return 'LocalVM';
             default: return 'Select Type';
             }
         },

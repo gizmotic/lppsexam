@@ -99,9 +99,6 @@ export async function switchExamSection(CommunicationHandler, serverstatus, newS
             log.warn('switchExamSection @ switchExamSection: no mainwindow for reroute');
             return;
         }
-        if (fromExamtype === 'localvm' || multicastClient.clientinfo.localVMState === 'running') {
-            await CommunicationHandler.stopLocalVmIfActive();
-        }
         if (config.development) {
             const hostId = examWin.webContents?.isDestroyed?.() ? null : examWin.webContents.id;
             webContents.getAllWebContents().forEach(wc => {
