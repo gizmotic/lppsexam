@@ -42,3 +42,6 @@ student/scripts/apple/wifi-helper
 
 test-results
 /.claude/worktrees/
+
+# spellcheck dictionaries are downloaded at build time (slim build)
+student/public/dictionaries/

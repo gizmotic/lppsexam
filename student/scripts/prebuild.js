@@ -20,6 +20,12 @@ function assertPdfJsDist() {
 }
 assertPdfJsDist();
 
+// slim build (no LanguageTool): fetch offline spellcheck dictionaries for the built-in Electron spellchecker
+if (process.env.LANGUAGE_HELP === 'false') {
+    try { (await import('node:child_process')).execFileSync(process.execPath, ['scripts/fetch-dictionaries.mjs'], { stdio: 'inherit' }); }
+    catch (e) { console.warn('⚠ fetch-dictionaries failed:', e.message); }
+}
+
 // Erstelle Datums-String
 const now = new Date();
 const buildDate = now.getFullYear() +

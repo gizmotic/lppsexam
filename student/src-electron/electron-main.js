@@ -26,6 +26,7 @@ import { inspect } from 'util';
 import log from 'electron-log';
 import { app, BrowserWindow, powerSaveBlocker, nativeTheme, globalShortcut, Tray, Menu, dialog, session, desktopCapturer } from 'electron'
 import config from '../src/utils/config.js';
+import { setupNativeSpellcheck, stopDictionaryServer } from './main/scripts/spellcheck.js';
 import multicastClient from './main/scripts/multicastclient.js'
 import { resetExamApiConnections } from './main/scripts/examApiFetch.js'
 import path from 'path'
@@ -257,6 +258,7 @@ const bindExamDownloadHandler = (sess) => {
 app.on('session-created', (_event, sess) => bindExamDownloadHandler(sess));
 
 app.on('window-all-closed', async () => {  // last window closed – clear storage here to avoid Linux segfault in before-quit
+    stopDictionaryServer()
     clearInterval( CommHandler.updateStudentIntervall )
     if (WindowHandler.checkWindowInterval?.stop) WindowHandler.checkWindowInterval.stop()
     if (CommHandler.updateScheduler?.stop) CommHandler.updateScheduler.stop()
@@ -345,6 +347,7 @@ app.whenReady()
 
     nativeTheme.themeSource = 'light'  // prevent theme settings from being adopted from windows
     bindExamDownloadHandler(session.defaultSession);
+    if (config.languageHelp === false) await setupNativeSpellcheck(session.defaultSession);   // slim build: built-in spellchecker with bundled dictionaries
     session.defaultSession.setUserAgent(`Next-Exam/${config.version} (${config.info}) ${process.platform} mit SEB-Kompatibilitätsmodus`);  // set user agent for all sessions
     installTeacherCertificateVerifier();
     multicastClient.onTeacherCertificateAccepted = async () => {

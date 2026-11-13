@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
 import dns from 'dns'
 import i18n from '../../../src/locales/locales.js'
 const {t} = i18n.global
-import { ipcMain, clipboard, app, webContents, dialog, shell } from 'electron'
+import { ipcMain, clipboard, app, webContents, dialog, shell, session } from 'electron'
 import { gateway4sync } from '../../../../shared/defaultGateway.js';
 import os, { networkInterfaces } from 'os'
 import log from 'electron-log';
@@ -36,6 +36,7 @@ import * as webFilter from './webFilter.js';
 import mammoth from 'mammoth';
 
 import languageToolServer from './lt-server';
+import { setSpellcheckLanguage } from './spellcheck.js';
 import platformDispatcher from './platformDispatcher.js';
 import { isAssessmentSessionActive } from './assessmentSession.js';
 import { updateSystemTray } from './traymenu.js';
@@ -713,6 +714,9 @@ class IpcHandler {
          * Start languageTool API Server (with Java JRE)
          * Runs at localhost 8088
          */
+        // slim build: switch the built-in spellchecker language to the exam's language
+        ipcMain.handle('setSpellcheckLanguage', (_event, lang) => setSpellcheckLanguage(session.defaultSession, lang));
+
         ipcMain.handle('startLanguageTool', (event) => {
             try {
                 languageToolServer.startServer();

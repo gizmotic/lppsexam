@@ -1142,6 +1142,10 @@ export default {
             // Only apply the configured language as a default — never overwrite a language the
             // student picked in the LanguageTool sidebar (it would reset on every serverstatus poll).
             if (!this.ltLanguageUserSet && lang !== this.ltLanguage) this.ltLanguage = lang;
+            if (window.config?.languageHelp === false && lang !== this._nativeSpellLang) {   // slim build: built-in spellchecker follows the exam language
+                this._nativeSpellLang = lang;
+                window.ipcRenderer.invoke('setSpellcheckLanguage', lang);
+            }
 
             const extHost = cfg.languagetoolhost || null;
             const extPort = String(cfg.languagetoolport || '8088');
