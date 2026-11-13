@@ -77,13 +77,35 @@ jobs:
             -Headers @{ Authorization = "Bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }).value
           Set-Content -Path $env:AZURE_FEDERATED_TOKEN_FILE -Value $token -NoNewline
 
-      - name: Student build
+      - name: Student build (mit Sprachhilfe)
         working-directory: ./student
         run: npm run build:win:portable
 
-      - name: Upload Student Windows x64 Portable EXE
+      # each build starts with "clean" (wipes dist) -> park the finished exe first
+      - name: Collect exe (mit Sprachhilfe)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Move-Item ./student/dist/electron/Packaged/Next-Exam-Student*x64.exe ./out/
+
+      - name: Refresh Azure federated token (student, ohne Sprachhilfe)
+        shell: pwsh
+        run: |
+          $token = (Invoke-RestMethod -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" `
+            -Headers @{ Authorization = "Bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }).value
+          Set-Content -Path $env:AZURE_FEDERATED_TOKEN_FILE -Value $token -NoNewline
+
+      - name: Student build (ohne Sprachhilfe)
+        working-directory: ./student
+        run: npm run build:win:portable:ohnesprachhilfe
+
+      - name: Collect exe (ohne Sprachhilfe)
+        shell: pwsh
+        run: Move-Item ./student/dist/electron/Packaged/Next-Exam-Student*x64.exe ./out/
+
+      - name: Upload Student Windows x64 Portable EXEs (beide Varianten)
         uses: actions/upload-artifact@v4
         with:
           name: next-exam-student-windows-x64-portable-exe
-          path: ./student/dist/electron/Packaged/Next-Exam-Student*x64.exe
+          path: ./out/Next-Exam-Student*x64.exe
           retention-days: 5
