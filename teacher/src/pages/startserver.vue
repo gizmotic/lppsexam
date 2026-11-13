@@ -1,282 +1,257 @@
 <template>
-<div class="startserver-page d-flex flex-column overflow-hidden" style="height: 100vh;">
-<!-- Header START -->
-<div class="w-100 p-3 text-white bg-dark text-left flex-shrink-0" style="height: 63px; z-index: 1000;">
-    <span class="text-white m-1">
-        <img src="/src/assets/img/svg/shield-lock-fill.svg" class="white me-2  " width="32" height="32" >
-        <span style="font-size:23px;" class="align-middle me-1 ">Next-Exam</span>
-    </span>
-    <span class="align-middle ms-3 " style="float: right; font-size:23px;">Teacher</span>
-    <div v-if="!hostip" id="adv" class="btn btn-sm btn-outline-danger  " style="cursor: unset; float: right">{{ $t("general.offline") }}</div>
-    <div v-if="hostip && hostip.interface" id="adv" class="btn btn-sm btn-outline-success " style=" float: right" @click="reconfigurePreferredInterface()">{{ hostip.interface }} :   {{ hostip.hostip }}</div>
-</div>
-<!-- Header END -->
- 
+<div class="nx-app nx-start">
 
-
-<div id="wrapper" class="w-100 d-flex flex-grow-1" style="min-height: 0;">
-
-    <!-- sidebar -->
-    <div id="sidebar" class="p-3 text-white bg-dark h-100 d-flex flex-column position-relative overflow-hidden" style="width: 240px; min-width: 240px;">
-        <div class="flex-shrink-0">
-        <div class="btn btn-light ms-1 text-start infobutton" @click="activeTab = 'pruefung'; selectedExam = null; servername = ''; password = ''; passwordConfirm = ''; advanced = false; checkExistingExam();" :style="activeTab !== 'pruefung' ? 'border-right: 2px solid #aaa; box-shadow: -6px -3px 10px -12px inset #000; color: #666;' : ''">
-            <img src='/src/assets/img/svg/server.svg' class="me-2"  width="16" height="16" :style="activeTab !== 'pruefung' ? 'opacity: 0.5;' : ''">
-            {{$t("general.startserver")}}
+    <!-- top bar -->
+    <header class="nx-topbar">
+        <div class="nx-brand">
+            <span class="nx-brand-mark">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+            </span>
+            Next-Exam
+            <span class="nx-pill nx-pill--primary ms-1">Teacher</span>
         </div>
-        <div v-if="config.bipIntegration" class="btn btn-light ms-1 mt-1 text-start infobutton" @click="activeTab = 'bildungsportal'; selectedExam = null; servername = ''; password = ''; passwordConfirm = ''; advanced = false; checkExistingExam();" :style="activeTab !== 'bildungsportal' ? 'border-right: 2px solid #aaa; box-shadow: -6px 0px 10px -12px inset #000; color: #666;' : ''">
-            <img src='/src/assets/img/svg/shield-lock-fill.svg' class="me-2 "  width="16" height="16"  :style="activeTab !== 'bildungsportal' ? 'opacity: 0.5;' : ''">
-            {{$t("dashboard.bildungsportal")}}
-        </div><br v-if="config.bipIntegration">
+        <div class="nx-spacer"></div>
 
-        <div v-if="freeDiscspace < 0.1" class="warning">  {{ $t("startserver.freespacewarning") }}   </div>
+        <span v-if="!hostip" class="nx-pill nx-pill--bad"><span class="nx-dot"></span>{{ $t("general.offline") }}</span>
+        <button v-else-if="hostip.interface" type="button" class="nx-pill nx-pill--ok nx-pill-btn" :title="$t('nx.wizard.changeNet')" @click="reconfigurePreferredInterface()">
+            <span class="nx-dot"></span>{{ hostip.interface }} · {{ hostip.hostip }}
+        </button>
 
-        <!-- Extended Settings START -->
-        <div class="form-check form-switch m-1 mb-2 mt-2">
-            <label for="advanced" class="form-check-label">{{$t('startserver.extendedsettings')}}</label>
-            <input id="advanced" type="checkbox"  v-model="advanced" class="form-check-input" @change="toggleAdvanced">
-        </div>
-        <button v-if="advanced" type="button" class="btn btn-sm btn-outline-light mx-1 mb-2" style="width: calc(100% - 0.5rem);" @click="decryptEncryptedPdf()" @mouseover="showDescription($t('dashboard.openEncryptedPdfTooltip'))" @mouseout="hideDescription">{{ $t('dashboard.openEncryptedPdf') }}</button>
-        <!-- Extended Settings END -->
- 
+        <button type="button" class="nx-btn nx-btn--ghost nx-btn--sm" :title="$t('startserver.languageinfo')" @click="toggleLocale">
+            {{ inactivelocale.toUpperCase() }}
+        </button>
+    </header>
 
+    <main class="nx-main">
+        <div class="nx-container">
 
-
-
-        <!-- BIP Section START -->
-        <div v-if="config.bipIntegration && activeTab === 'bildungsportal'" class="m-0 mt-3" style="">
-
-            <div v-if="bipToken" title="logout" id="biploginbutton" @click="logoutBiP()" class="btn btn-success m-1" style="padding:0px;">
-                <img id="biplogo" style="filter: hue-rotate(140deg);  width:100%; border-top-left-radius:3px;border-top-right-radius:3px; margin:0; " src="/src/assets/img/login_students.jpg">
-                <span style="padding:2px; font-size:0.9em;"  id="biploginbuttonlabel">Logout</span>
+            <!-- local / bildungsportal switch -->
+            <div v-if="config.bipIntegration" class="nx-center mb-4">
+                <div class="nx-seg" role="tablist">
+                    <button type="button" role="tab" :class="{ 'is-active': activeTab === 'pruefung' }" @click="switchTab('pruefung')">{{ $t('nx.wizard.tab_local') }}</button>
+                    <button type="button" role="tab" :class="{ 'is-active': activeTab === 'bildungsportal' }" @click="switchTab('bildungsportal')">{{ $t('nx.wizard.tab_bip') }}</button>
+                </div>
             </div>
-            <div v-else title="login" id="biploginbutton" @click="loginBiP()" class="btn btn-success m-1" style="padding:0px;">
-                <img id="biplogo" style="width:100%; border-top-left-radius:3px;border-top-right-radius:3px; margin:0; " src="/src/assets/img/login_students.jpg">
-                <span style="padding:2px; font-size:0.9em;"  id="biploginbuttonlabel">Login</span>
+
+            <div v-if="freeDiscspace < 0.1" class="nx-center mb-3">
+                <span class="nx-pill nx-pill--warn">⚠ {{ $t("startserver.freespacewarning") }}</span>
             </div>
-        </div>
-        <!-- BIP Section END -->
-        </div>
-        
-        <div id="sidebar-bottom" class="flex-shrink-0 mt-auto position-relative">
-            <button class="btn btn-outline-secondary btn-sm ms-1 mt-2 mb-1" @click="toggleLocale" @mouseover="showDescription($t('startserver.languageinfo'))" @mouseout="hideDescription">{{ inactivelocale }}</button>
-        </div>
-    </div>
 
-    <!-- maincontent -->
-    <div id="content" class="fadeinslow p-3 d-flex flex-column flex-grow-1" style="min-height: 0;">
-        <div class="col8 d-flex flex-column flex-grow-1" style="min-height: 0;">
+            <!-- ================= LOCAL EXAM WIZARD ================= -->
+            <template v-if="activeTab === 'pruefung'">
+            <section class="nx-card nx-card--pad nx-wizard">
 
-            <!-- Create exam START -->
-            <div v-if="activeTab === 'pruefung'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
-                <div class="flex-shrink-0">
-                <div class="input-group mb-1 mt-0 examname-input-row">
-                    <span class="input-group-text col-2 grayback" id="inputGroup-sizing-lg" style="width:170px;max-width:170px;min-width:170px;">{{$t("startserver.examname")}}</span>
-                    <input v-model="servername" @paste="onServernamePasteOrDrop" @drop="onServernamePasteOrDrop" @dragover.prevent maxlength="20" type="text" class="form-control" id="servername" placeholder="5a-mathematik" style="width:200px;max-width:200px;min-width:135px;">
-                    <Transition name="servername-charset-hint">
-                        <span v-if="showServernameCharsetHint" class="servername-charset-hint ms-2 align-self-center">{{ $t("startserver.examnameCharsetHint") }}</span>
+                <div class="nx-stepper mb-4">
+                    <div class="nx-step" :class="{ 'is-active': step === 1, 'is-done': step > 1, 'is-clickable': step > 1 }" @click="step > 1 && goStep(1)">
+                        <span class="nx-step-num"><template v-if="step > 1">✓</template><template v-else>1</template></span>{{ $t('nx.wizard.step1') }}
+                    </div>
+                    <div class="nx-step-line" :class="{ 'is-done': step > 1 }"></div>
+                    <div class="nx-step" :class="{ 'is-active': step === 2 }">
+                        <span class="nx-step-num">2</span>{{ $t('nx.wizard.step2') }}
+                    </div>
+                </div>
+
+                <Transition :name="stepDir === 'back' ? 'nx-slide-back' : 'nx-slide-fwd'" mode="out-in">
+
+                <!-- STEP 1: name -->
+                <div v-if="step === 1" key="s1">
+                    <h1 class="nx-h1">{{ $t('nx.wizard.q1') }}</h1>
+                    <p class="nx-lead">{{ $t('nx.wizard.q1hint') }}</p>
+
+                    <div class="nx-field mt-4">
+                        <label class="nx-label" for="servername">{{ $t('startserver.examname') }}</label>
+                        <input id="servername" v-model="servername" type="text" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false"
+                               class="nx-input" :class="{ 'is-invalid': bipNameConflict }" placeholder="5a-mathematik"
+                               @keypress="validateInput" @input="checkExistingExam" @paste="onServernamePasteOrDrop" @drop="onServernamePasteOrDrop" @dragover.prevent
+                               @keyup.enter="canContinue && goStep(2)">
+                        <div class="nx-hint" :class="{ 'is-error': bipNameConflict, 'is-ok': showServernameCharsetHint || (existingExam && !bipNameConflict) }">
+                            <template v-if="bipNameConflict">⚠ {{ $t('startserver.bipNameConflictShort') }}</template>
+                            <template v-else-if="showServernameCharsetHint">{{ $t('startserver.examnameCharsetHint') }}</template>
+                            <template v-else-if="existingExam">✓ {{ $t('nx.wizard.sumResume') }}</template>
+                        </div>
+                    </div>
+
+                    <div class="nx-actions mt-3">
+                        <button id="examnext" type="button" class="nx-btn nx-btn--primary nx-btn--lg" :disabled="!canContinue" @click="goStep(2)" data-e2e="wizard-next">
+                            {{ $t('nx.wizard.next') }}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2: check + start -->
+                <div v-else key="s2">
+                    <h1 class="nx-h1">{{ $t('nx.wizard.q2') }}</h1>
+                    <p class="nx-lead">{{ $t('nx.wizard.q2hint') }}</p>
+
+                    <dl class="nx-summary mt-4">
+                        <div><dt>{{ $t('nx.wizard.sumName') }}</dt>
+                            <dd><b>{{ servername }}</b>
+                                <span class="nx-pill ms-2" :class="existingExam ? 'nx-pill--warn' : 'nx-pill--primary'">{{ existingExam ? $t('nx.wizard.sumResume') : $t('nx.wizard.sumNew') }}</span></dd></div>
+                        <div><dt>{{ $t('nx.wizard.sumNet') }}</dt>
+                            <dd v-if="hostip && hostip.interface">{{ hostip.interface }} · {{ hostip.hostip }}</dd>
+                            <dd v-else class="text-danger">{{ $t('nx.wizard.sumNetOffline') }}</dd></div>
+                        <div><dt>{{ $t('nx.wizard.sumFolder') }}</dt>
+                            <dd class="text-truncate" :title="backupdir || workdir">{{ backupdir || workdir }}</dd></div>
+                    </dl>
+
+                    <button type="button" class="nx-btn nx-btn--ghost nx-btn--sm mt-3" @click="showOptions = !showOptions">
+                        {{ showOptions ? $t('nx.wizard.lessOptions') : $t('nx.wizard.moreOptions') }}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showOptions ? 'rotate(180deg)' : '' }"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+
+                    <Transition name="nx-fade-y">
+                    <div v-if="showOptions" class="nx-options">
+                        <div class="nx-field">
+                            <label class="nx-label" for="examPassword">{{ $t('nx.wizard.pwdLead') }}</label>
+                            <div class="nx-hint mb-1">{{ $t('nx.wizard.pwdLeadInfo') }}</div>
+                            <div class="nx-pw-row">
+                                <input id="examPassword" v-model="password" :type="showPassword ? 'text' : 'password'" class="nx-input nx-input--md" :disabled="passwordLocked" :placeholder="$t('startserver.pwd')" autocomplete="off">
+                                <input v-model="passwordConfirm" :type="showPassword ? 'text' : 'password'" class="nx-input nx-input--md" :disabled="passwordLocked" :class="passwordMismatch ? 'is-invalid' : (passwordConfirm !== '' ? 'is-valid' : '')" :placeholder="$t('startserver.pwdconfirm')" autocomplete="off">
+                                <button type="button" class="nx-btn nx-btn--icon" tabindex="-1" @click="togglePasswordVisibility" :title="showPassword ? 'Hide' : 'Show'">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/><path v-if="showPassword" d="M3 3l18 18"/></svg>
+                                </button>
+                            </div>
+                            <div class="nx-hint is-error" v-if="passwordMismatch">⚠ {{ $t('startserver.pwdmismatch') }}</div>
+                        </div>
+
+                        <div class="nx-field mt-3">
+                            <label class="nx-label">{{ $t('startserver.backupfolder') }}</label>
+                            <div class="nx-hint mb-1">{{ $t('startserver.backupfolderinfo') }}</div>
+                            <div class="nx-pw-row">
+                                <div class="nx-path text-truncate" :title="backupdir">{{ backupdir || '—' }}</div>
+                                <button id="backupdirbutton" type="button" class="nx-btn nx-btn--sm" @click="setBackupdir()">{{ $t('nx.wizard.changeFolder') }}</button>
+                            </div>
+                        </div>
+
+                        <button type="button" class="nx-btn nx-btn--sm mt-3" :title="$t('dashboard.openEncryptedPdfTooltip')" @click="decryptEncryptedPdf()">{{ $t('dashboard.openEncryptedPdf') }}</button>
+                    </div>
                     </Transition>
-                    <span v-if="bipNameConflict" class="text-warning ms-2 align-self-center text-nowrap text-truncate examname-bip-conflict-hint">⚠ {{$t("startserver.bipNameConflictShort")}}</span>
-                </div>
 
-                <!-- could be used to set an ESCAPE PASSWORD for students to make it harder to leave on connection loss -->
-                <template v-if="advanced">
-                <div class="input-group mb-1" style="max-width: fit-content" @mouseover="showDescription($t('startserver.pwdinfo'))" @mouseout="hideDescription">
-                    <span id="pwd" class="input-group-text col-2 grayback"  style="width:170px;">{{$t("startserver.pwd")}}</span>
-                    <input v-model="password" :type="showPassword ? 'text' : 'password'" class="form-control" id="examPassword" placeholder="next-exam" style="width:200px;">
-                    <button @click="togglePasswordVisibility" class="password-visibility-btn" type="button" tabindex="-1">
-                        <img :src="showPassword ? '/src/assets/img/svg/eye-slash-fill.svg' : '/src/assets/img/svg/eye-fill.svg'" class="password-visibility-icon" width="16" height="16">
-                    </button>
-                </div>
-                <div class="input-group mb-1" style="max-width: fit-content" @mouseover="showDescription($t('startserver.pwdinfo'))" @mouseout="hideDescription">
-                    <span class="input-group-text col-2 grayback" style="width:170px;">{{$t("startserver.pwdconfirm")}}</span>
-                    <input v-model="passwordConfirm" :type="showPassword ? 'text' : 'password'" class="form-control" :class="passwordMismatch ? 'is-invalid' : (passwordConfirm !== '' ? 'is-valid' : '')" style="width:200px;">
-                    <span v-if="passwordMismatch || !password" class="text-danger ms-2 align-self-center" style="font-size:0.8em;">⚠ {{ passwordMismatch ? $t("startserver.pwdmismatch") : $t("startserver.pwdempty") }}</span>
-                </div>
-                </template>
-
-                <div v-if="advanced" class="input-group mb-1" style="max-width: fit-content" @mouseover="showDescription($t('startserver.backupfolderinfo'))" @mouseout="hideDescription">
-                    <span id="backupdir" class="input-group-text col-2 grayback"  style="width:170px;">{{$t("startserver.backupfolder")}}</span>
-                    <span class="form-control text-truncate" style="width:360px;  font-size: 0.9em; padding-top: 8px; white-space: pre;">{{ backupdir }}</span>
-                    <button @click="setBackupdir()" id="backupdirbutton" class="btn btn-cyan p-0" style="width:40px;" :title="$t('startserver.backupfolderinfo')" >
-                        <img src="/src/assets/img/svg/settings.svg" style="vertical-align: sub;" class="snowwhite" width="18" height="18" >
-                    </button>
-                </div>
-
-                <button @click="startServer()" :class="(!hostip || !servername || (advanced && (!password || !passwordConfirm || passwordMismatch))) ? 'disabledstart':''" id="examstart" class="ps-1 pe-1 mb-3 btn btn-cyan" value="start exam" style="width:170px;max-width:170px;min-width:170px;" @mouseover="showDescription($t('startserver.startinfo'))" @mouseout="hideDescription">{{$t("startserver.start")}}</button>
-                </div><!-- /flex-shrink-0 -->
-
-                <!-- Local exams widget grid START -->
-                <div class="flex-grow-1 exam-list-scroll">
-                <div v-if="previousLocalExams && previousLocalExams.length > 0" class="text-secondary" style="margin-left: 2px; margin-top: 12px;">
-                    <span>{{$t("startserver.previousexams")}}</span>
-                </div>
-                <div v-if="previousLocalExams && previousLocalExams.length > 0" class="bip-widget-grid">
-                    <div
-                        v-for="exam of previousLocalExams"
-                        :key="`local-main-${exam.examName}`"
-                        class="bip-exam-card bip-exam-card-local"
-                        :class="{ 'bg-cyan-transparent': servername === exam.examName, 'cursornotallowed': !isExamVersionCompatible(exam) }"
-                        @click="isExamVersionCompatible(exam) ? setPreviousExam(exam) : ''"
-                        :title="!isExamVersionCompatible(exam) ? $t('startserver.incompatible') : ''"
-                    >
-                        <!-- Name -->
-                        <div class="bip-exam-card-head">
-                            <span class="badge text-white flex-shrink-0 bg-cyan">local</span>
-                            <div class="bip-exam-name fw-semibold small">{{ exam.examName }}</div>
-                            <button @click.stop="duplicateExam(exam)" class="btn btn-sm btn-cyan py-0 px-1 ms-auto" style="height:18px; font-size:0.7em; line-height:1;" @mouseover.stop="showDescription($t('startserver.duplicateinfo'))" @mouseout="hideDescription">{{ $t("startserver.duplicate") }}</button>
-                            <button @click.stop="delPreviousExam(exam.examName)" class="btn btn-sm btn-warning p-0" style="width:18px; height:18px; font-size:0.7em; line-height:1;" @mouseover.stop="showDescription($t('startserver.deleteexaminfo'))" @mouseout="hideDescription">✕</button>
-                        </div>
-
-                        <!-- Date / Duration -->
-                        <div class="bip-exam-info-row text-secondary">
-                            <span v-if="exam.examDate">{{ exam.examDate.slice(8,10) }}.{{ exam.examDate.slice(5,7) }}.{{ exam.examDate.slice(0,4) }} {{ exam.examDate.slice(11,16) }}</span>
-                            <span class="text-muted" v-if="exam.examDate && exam.examDurationMinutes">·</span>
-                            <span v-if="exam.examDurationMinutes">{{ exam.examDurationMinutes }} min</span>
-                        </div>
-
-                        <!-- Feature badges -->
-                        <div class="bip-feature-badges">
-                            <span v-if="exam.examSections && exam.examSections[exam.activeSection]"
-                                  class="badge bip-type-badge"
-                                  :class="`bip-type-${exam.examSections[exam.activeSection].examtype}`">
-                                {{ {math:'Mathematik', editor:'Sprachen', eduvidual:$t('dashboard.eduvidual'), website:'Website', activesheets:'Active Sheets', microsoft365:'Microsoft 365'}[exam.examSections[exam.activeSection].examtype] || exam.examSections[exam.activeSection].examtype }}
-                            </span>
-                            <span v-if="exam.examSections && exam.examSections[exam.activeSection] && exam.examSections[exam.activeSection].groups" class="badge bip-type-sus">A/B</span>
-                            <span v-if="exam.screenslocked" class="badge bg-danger-subtle text-danger border border-danger-subtle">gesperrt</span>
-                            <span v-if="exam.useExamSections" class="badge bg-secondary" @mouseover="showDescription(exam.allowSectionSwitch ? $t('startserver.sectionByStudentInfo') : $t('startserver.sectionByTeacherInfo'))" @mouseout="hideDescription">§ {{ exam.allowSectionSwitch ? 'S' : 'T' }}</span>
-                            <span v-if="exam.pin" class="badge bg-secondary-subtle text-secondary bip-status-pill ms-auto">{{ exam.pin }}</span>
-                        </div>
+                    <div class="nx-actions mt-4">
+                        <button type="button" class="nx-btn nx-btn--lg" @click="goStep(1)">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+                            {{ $t('nx.wizard.back') }}
+                        </button>
+                        <button id="examstart" type="button" class="nx-btn nx-btn--success nx-btn--lg" :disabled="!hostip || startBlocked" @click="startServer()" data-e2e="wizard-start">
+                            {{ existingExam ? $t('nx.wizard.goResume') : $t('nx.wizard.go') }}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
                     </div>
                 </div>
-                <!-- Local exams widget grid END -->
-                </div><!-- /exam-list-scroll -->
-            </div>
-            <!-- Create exam END -->
+                </Transition>
+            </section>
 
-            <!-- Bildungsportal START -->
-            <div v-if="activeTab === 'bildungsportal'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
-                <div class="flex-shrink-0">
-                <div v-if="!bipToken" class="text-secondary mt-1" style=" margin-left: 2px; margin-bottom: 14px;">
-                    <span>{{$t("startserver.bippleaselogin")}}</span>
-                </div>
-                <div v-if="bipToken" class="text-secondary mt-1" style=" margin-left: 2px; margin-bottom: 14px;">
-                    <span>{{$t("startserver.bipwelcome")}} {{bipUsername}}!</span>
-                </div>
-
-                <template v-if="advanced">
-                <div class="input-group mb-1" style="max-width: fit-content" @mouseover="showDescription($t('startserver.pwdinfo'))" @mouseout="hideDescription">
-                    <span id="pwd" class="input-group-text col-2 grayback"  style="width:170px;">{{$t("startserver.pwd")}}</span>
-                    <input v-model="password" :type="showPassword ? 'text' : 'password'" class="form-control" id="examPassword" placeholder="next-exam" style="width:200px;">
-                    <button @click="togglePasswordVisibility" class="password-visibility-btn" type="button" tabindex="-1">
-                        <img :src="showPassword ? '/src/assets/img/svg/eye-slash-fill.svg' : '/src/assets/img/svg/eye-fill.svg'" class="password-visibility-icon" width="16" height="16">
-                    </button>
-                </div>
-                <div class="input-group mb-1" style="max-width: fit-content" @mouseover="showDescription($t('startserver.pwdinfo'))" @mouseout="hideDescription">
-                    <span class="input-group-text col-2 grayback" style="width:170px;">{{$t("startserver.pwdconfirm")}}</span>
-                    <input v-model="passwordConfirm" :type="showPassword ? 'text' : 'password'" class="form-control" :class="passwordMismatch ? 'is-invalid' : (passwordConfirm !== '' ? 'is-valid' : '')" style="width:200px;">
-                    <span v-if="passwordMismatch || !password" class="text-danger ms-2 align-self-center" style="font-size:0.8em;">⚠ {{ passwordMismatch ? $t("startserver.pwdmismatch") : $t("startserver.pwdempty") }}</span>
-                </div>
-                </template>
-
-                <div v-if="advanced" class="input-group mb-1" style="max-width: fit-content" @mouseover="showDescription($t('startserver.backupfolderinfo'))" @mouseout="hideDescription">
-                    <span id="backupdir" class="input-group-text col-2 grayback"  style="width:170px;">{{$t("startserver.backupfolder")}}</span>
-                    <span class="form-control text-truncate" style="width:360px;  font-size: 0.9em; padding-top: 8px; white-space: pre;">{{ backupdir }}</span>
-                    <button @click="setBackupdir()" id="backupdirbutton" class="btn btn-info p-0" style="width:40px;" :title="$t('startserver.backupfolderinfo')" >
-                        <img src="/src/assets/img/svg/settings.svg" style="vertical-align: sub;" class="" width="18" height="18" >
-                    </button>
-                </div>
-
-                <button @click="startServer()" :class="(!hostip || !bipToken || !servername || (advanced && (!password || !passwordConfirm || passwordMismatch))) ? 'disabledstart':''" id="examstart" class="ps-1 pe-1 mb-3 btn btn-success" value="start exam" style="width:170px;max-width:170px;min-width:170px;" @mouseover="showDescription($t('startserver.startinfo'))" @mouseout="hideDescription">{{$t("startserver.start")}}</button>
-                </div><!-- /flex-shrink-0 -->
-
-                <!-- BiP exams START -->
-                <div class="flex-grow-1 exam-list-scroll">
-                <div v-if="bipToken" class="text-secondary " style=" margin-left: 2px; margin-top: 12px;">
-                    <span>{{$t("startserver.onlineexams")}}</span>
-                    <button v-if="bipToken" class="btn p-0 white ms-1 mb-1" style="line-height: 0;" @click="fetchBipExams" title="Aktualisieren">
-                        <img src="/src/assets/img/svg/gtk-convert.svg" width="16" height="16">
-                    </button>
-                </div>
-
-                <div v-if="onlineExams && onlineExams.length > 0" class="bip-widget-grid">
-                    <div
-                        v-for="exam of onlineExams"
-                        :key="`bip-main-${exam.id}-${exam.examName}`"
-                        class="bip-exam-card bip-exam-card-bip"
-                        :class="{ 'bip-exam-card-active': servername === exam.examName, 'cursornotallowed': !isExamVersionCompatible(exam) }"
-                        @click="isExamVersionCompatible(exam) ? setOnlineExam(exam) : ''"
-                        :title="!isExamVersionCompatible(exam) ? $t('startserver.incompatible') : ''"
-                    >
-                        <!-- Name + PIN -->
-                        <div class="bip-exam-card-head">
-                            <span class="badge text-white flex-shrink-0" :class="exam.requireBiP ? 'bg-success' : 'bg-secondary'">BiP</span>
-                            <div class="bip-exam-name fw-semibold small">{{ exam.examName }}</div>
-                            <button v-if="previousBipExams.some(p => p.examName === exam.examName)" @click.stop="delPreviousExam(exam.examName)" class="btn btn-sm btn-warning p-0 ms-auto" style="width:18px; height:18px; font-size:0.7em; line-height:1;" @mouseover.stop="showDescription($t('startserver.deleteexaminfo'))" @mouseout="hideDescription">✕</button>
+            <!-- previous exams -->
+            <section class="mt-5">
+                <div class="nx-eyebrow mb-2">{{ $t('nx.wizard.recent') }}</div>
+                <div v-if="!previousLocalExams.length" class="nx-muted">{{ $t('nx.wizard.recentEmpty') }}</div>
+                <div class="nx-recent-grid">
+                    <article v-for="exam of previousLocalExams" :key="`local-${exam.examName}`"
+                             class="nx-card nx-card--interactive nx-exam" :class="{ 'nx-card--selected': servername === exam.examName, 'is-incompatible': !isExamVersionCompatible(exam) }"
+                             :title="!isExamVersionCompatible(exam) ? $t('startserver.incompatible') : ''"
+                             @click="isExamVersionCompatible(exam) && pickRecent(exam)">
+                        <div class="nx-exam-head">
+                            <b class="text-truncate">{{ exam.examName }}</b>
+                            <div class="nx-exam-actions">
+                                <button type="button" class="nx-btn nx-btn--ghost nx-btn--sm nx-btn--icon" :title="$t('startserver.duplicateinfo')" @click.stop="duplicateExam(exam)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+                                </button>
+                                <button type="button" class="nx-btn nx-btn--ghost nx-btn--sm nx-btn--icon nx-danger-hover" :title="$t('startserver.deleteexaminfo')" @click.stop="delPreviousExam(exam.examName)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                                </button>
+                            </div>
                         </div>
-
-                        <!-- Date / Duration -->
-                        <div class="bip-exam-info-row text-secondary">
-                            <span v-if="exam.examDate">{{ exam.examDate.slice(8,10) }}.{{ exam.examDate.slice(5,7) }}.{{ exam.examDate.slice(0,4) }} {{ exam.examDate.slice(11,16) }}</span>
-                            <span class="text-muted" v-if="exam.examDate && exam.examDurationMinutes">·</span>
-                            <span v-if="exam.examDurationMinutes">{{ exam.examDurationMinutes }} min</span>
+                        <div class="nx-muted nx-exam-meta">
+                            <span v-if="exam.examDate">{{ exam.examDate.slice(8,10) }}.{{ exam.examDate.slice(5,7) }}.{{ exam.examDate.slice(0,4) }}</span>
+                            <span v-if="exam.examDurationMinutes">· {{ exam.examDurationMinutes }} {{ $t('nx.wizard.minutes') }}</span>
                         </div>
-
-                        <!-- Feature badges -->
-                        <div class="bip-feature-badges">
-                            <span v-if="exam.examSections && exam.examSections[exam.activeSection]"
-                                  class="badge bip-type-badge"
-                                  :class="`bip-type-${exam.examSections[exam.activeSection].examtype}`">
-                                {{ {math:'Mathematik', editor:'Sprachen', eduvidual:$t('dashboard.eduvidual'), website:'Website', activesheets:'Active Sheets', microsoft365:'Microsoft 365'}[exam.examSections[exam.activeSection].examtype] || exam.examSections[exam.activeSection].examtype }}
-                            </span>
-                            <span v-if="exam.examSections && exam.examSections[exam.activeSection] && exam.examSections[exam.activeSection].groups" class="badge bip-type-sus">A/B</span>
-                            <span v-if="exam.screenslocked" class="badge bg-danger-subtle text-danger border border-danger-subtle">gesperrt</span>
-                            <span v-if="exam.useExamSections" class="badge bip-type-sus" @mouseover="showDescription(exam.allowSectionSwitch ? $t('startserver.sectionByStudentInfo') : $t('startserver.sectionByTeacherInfo'))" @mouseout="hideDescription">§ {{ exam.allowSectionSwitch ? 'S' : 'T' }}</span>
-                            <span v-if="exam.examStudents && exam.examStudents.length" class="badge bip-type-sus">{{ exam.examStudents.length }} SuS</span>
-                            <span v-if="exam.pin" class="badge bg-secondary-subtle text-secondary bip-status-pill ms-auto">{{ exam.pin }}</span>
+                        <div class="nx-exam-tags">
+                            <span v-if="examTypeOf(exam)" class="nx-pill nx-pill--primary">{{ examTypeLabel(examTypeOf(exam)) }}</span>
+                            <span v-if="exam.examSections && exam.examSections[exam.activeSection] && exam.examSections[exam.activeSection].groups" class="nx-pill">A/B</span>
+                            <span v-if="exam.screenslocked" class="nx-pill nx-pill--bad">{{ $t('dashboard.lock') }}</span>
                         </div>
+                    </article>
+                </div>
+            </section>
+            </template>
+
+            <!-- ================= BILDUNGSPORTAL ================= -->
+            <template v-else>
+            <section class="nx-card nx-card--pad nx-wizard">
+                <template v-if="!bipToken">
+                    <h1 class="nx-h1">{{ $t('dashboard.bildungsportal') }}</h1>
+                    <p class="nx-lead">{{ $t('startserver.bippleaselogin') }}</p>
+                    <div class="nx-actions mt-3">
+                        <button id="biploginbutton" type="button" class="nx-btn nx-btn--primary nx-btn--lg" @click="loginBiP()">Login</button>
                     </div>
+                </template>
+                <template v-else>
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="flex-grow-1">
+                            <h1 class="nx-h1">{{ $t('startserver.bipwelcome') }}<template v-if="bipUsername">, {{ bipUsername }}</template>!</h1>
+                            <p class="nx-lead">{{ $t('startserver.onlineexams') }}</p>
+                        </div>
+                        <button type="button" class="nx-btn nx-btn--sm" title="Refresh" @click="fetchBipExams">↻</button>
+                        <button id="biploginbutton" type="button" class="nx-btn nx-btn--sm" title="logout" @click="logoutBiP()">Logout</button>
+                    </div>
+
+                    <div class="nx-recent-grid mt-4">
+                        <article v-for="exam of onlineExams" :key="`bip-${exam.id}-${exam.examName}`"
+                                 class="nx-card nx-card--interactive nx-exam" :class="{ 'nx-card--selected': servername === exam.examName, 'is-incompatible': !isExamVersionCompatible(exam) }"
+                                 :title="!isExamVersionCompatible(exam) ? $t('startserver.incompatible') : ''"
+                                 @click="isExamVersionCompatible(exam) && setOnlineExam(exam)">
+                            <div class="nx-exam-head">
+                                <b class="text-truncate">{{ exam.examName }}</b>
+                                <span v-if="exam.pin" class="nx-pill">{{ exam.pin }}</span>
+                            </div>
+                            <div class="nx-muted nx-exam-meta">
+                                <span v-if="exam.examDate">{{ exam.examDate.slice(8,10) }}.{{ exam.examDate.slice(5,7) }}.{{ exam.examDate.slice(0,4) }} {{ exam.examDate.slice(11,16) }}</span>
+                                <span v-if="exam.examDurationMinutes">· {{ exam.examDurationMinutes }} {{ $t('nx.wizard.minutes') }}</span>
+                            </div>
+                            <div class="nx-exam-tags">
+                                <span v-if="examTypeOf(exam)" class="nx-pill nx-pill--primary">{{ examTypeLabel(examTypeOf(exam)) }}</span>
+                                <span v-if="exam.examStudents && exam.examStudents.length" class="nx-pill">{{ exam.examStudents.length }} SuS</span>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="nx-actions mt-4">
+                        <button id="examstart" type="button" class="nx-btn nx-btn--success nx-btn--lg" :disabled="!hostip || !servername || startBlocked" @click="startServer()">
+                            {{ existingExam ? $t('nx.wizard.goResume') : $t('nx.wizard.go') }}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <button id="bipcheck" type="button" class="nx-btn" @click="fetchBiPNews()">BiP News</button>
+                    </div>
+                </template>
+            </section>
+
+            <!-- BiP news -->
+            <Transition name="nx-fade-y">
+            <section v-if="BipInfoActive" id="bipinfo" class="nx-card nx-card--pad mt-4">
+                <div class="nx-eyebrow mb-2">BiP News</div>
+                <div v-if="bipnewsSorted.length == 0" class="nx-muted">{{ $t('startserver.noNews') }}</div>
+                <div v-for="entry in bipnewsSorted" :key="entry.id" class="nx-news">
+                    <b>{{ entry.subject }}</b>
+                    <div v-if="entry.message" v-external-links v-html="entry.message"></div>
+                    <div class="nx-muted nx-exam-meta">{{ formatUnixDate(entry.timecreated) }} | {{ entry.author.fullname }}</div>
                 </div>
-                </div><!-- /exam-list-scroll -->
-            </div>
-            <!-- Bildungsportal END -->
+            </section>
+            </Transition>
+            </template>
 
         </div>
+    </main>
 
-        
+    <footer class="nx-foot">
+        <span class="nx-foot-link" @click="showCopyleft()"><span style="display:inline-block; transform: scaleX(-1);">&copy;</span> {{ version }} {{ info }}</span>
+    </footer>
 
-
-    </div>
-</div>
-
-
-
- <span @click="showCopyleft()" id="release" class="bg-dark text-white">
-    <span style="display:inline-block; transform: scaleX(-1); font-size:1.2em; vertical-align: middle;">&copy;</span>
-    <span >&nbsp;{{version}} {{ info }}</span>
-</span>
-<div v-if="showDesc" id="description" class="bg-dark text-white">{{ currentDescription }}</div>
-<div id="statusdiv" class="bg-dark text-white">{{$t("startserver.connected")}}</div>
-
- <!-- BIB Infos START -->
- <div id="bipinfo">
-    <div id="bipcheck" @click="fetchBiPNews();"> <div id="eye" class="darkgreen eyeopen"></div> &nbsp;BiP News</div>
-    <div class="bipscrollarea">     
-        <div v-if="bipnewsSorted.length == 0"  style="text-align: left; font-size: 0.8em; margin-left:10px;"> {{ $t('startserver.noNews') }}</div> 
-        <div v-for="entry in bipnewsSorted" :key="entry.id" class="bipentry">
-            <div class="color-circle" style="width: 10px; height: 10px;"></div>
-            <div class="subject">{{ entry.subject }} </div>
-            <div class="message" v-if="entry.message" v-external-links v-html="entry.message"></div>
-            <div class="created">
-                <div style=" padding-top:1px; display:inline-block;">{{ formatUnixDate(entry.timecreated) }} | {{ entry.author.fullname }}</div> <img :src="entry.author.urls.profileimage" style="float:right; width: 20px; height: 20px; border-radius: 50%;">
-            </div> 
-        </div> 
-    </div>
-</div>
-<!-- BIB Infos END -->
-
+    <Transition name="nx-toast">
+        <div v-if="toast" class="nx-toast" role="status">{{ toast }}</div>
+    </Transition>
 </div>
 </template>
-
 
 
 <script lang="ts">
@@ -313,7 +288,12 @@ export default {
             electron: this.$route.params.electron,
             hostname: window.location.hostname,
             hostip: this.$route.params.config.hostip,
-            advanced: false,
+            step: 1,
+            stepDir: 'forward',
+            showOptions: false,
+            existingExam: null as any,
+            toast: '',
+            toastTimer: null as any,
             showPassword: false,
             workdir: this.$route.params.config.workdirectory,
             backupdir: '',
@@ -334,8 +314,6 @@ export default {
             bipnews: [],
             BipInfoActive: false,
             activeTab: 'pruefung',
-            showDesc: false,
-            currentDescription: '',
         };
     },
     components: {},
@@ -383,13 +361,21 @@ export default {
         // True while exam name or the advanced exam password is missing/mismatched (start/resume must stay locked).
         startBlocked() {
             if (!this.servername) { return true; }
-            return this.advanced && (!this.password || !this.passwordConfirm || this.passwordMismatch);
+            if (this.bipNameConflict) { return true; }
+            if (this.existingExam && !this.isExamVersionCompatible(this.existingExam)) { return true; }
+            return this.passwordMismatch;
+        },
+        // name is valid enough to leave step 1
+        canContinue() {
+            return !!this.servername && !this.bipNameConflict && !(this.existingExam && !this.isExamVersionCompatible(this.existingExam));
+        },
+        // an existing exam with a stored password keeps it (field is locked)
+        passwordLocked() {
+            return !!this.existingExam && typeof this.existingExam.examPassword === 'string' && this.existingExam.examPassword.trim() !== '';
         },
         // Password sent to control API / dashboard when the user leaves advanced empty (legacy default).
         effectiveExamPassword() {
-            if (this.password) return this.password;
-            if (!this.advanced) return "next-exam";
-            return "";
+            return this.password || "next-exam";
         }
     },
 
@@ -415,6 +401,39 @@ export default {
             return `${day}.${month}.${year}`;
         },
 
+
+        // wizard navigation
+        goStep(n) {
+            this.stepDir = n < this.step ? 'back' : 'forward';
+            this.step = n;
+            if (n === 1) { this.$nextTick(() => document.getElementById('servername')?.focus()); }
+        },
+
+        switchTab(tab) {
+            this.activeTab = tab;
+            this.selectedExam = null; this.servername = ''; this.password = ''; this.passwordConfirm = '';
+            this.showOptions = false;
+            this.step = 1;
+            this.checkExistingExam();
+        },
+
+        // click on a previous exam card: take over the name and jump to the start step
+        async pickRecent(exam) {
+            await this.setPreviousExam(exam);
+            if (this.canContinue) this.goStep(2);
+        },
+
+        examTypeOf(exam) {
+            return exam?.examSections?.[exam.activeSection]?.examtype || '';
+        },
+        examTypeLabel(type) {
+            const map = {
+                math: this.$t('dashboard.math'), editor: this.$t('dashboard.lang'), eduvidual: this.$t('dashboard.eduvidual'),
+                forms: this.$t('dashboard.forms'), website: 'Website', activesheets: 'Active Sheets',
+                microsoft365: this.$t('dashboard.microsoft365'), rdp: 'RDP',
+            };
+            return map[type] || type;
+        },
 
         toggleLocale() {
             // Toggle between 'de' and 'en'
@@ -447,10 +466,6 @@ export default {
                     this.bipuserID = false
                     this.bipData = null
                     this.onlineExams = []
-                    const loginBtn = document.querySelector('#biploginbutton')
-                    if (loginBtn) {
-                        loginBtn.classList.remove('disabledbutton')
-                    }
                     this.$router.replace({ path: '/' })
                 } 
             });
@@ -489,16 +504,6 @@ export default {
                     
                     this.bipUsername = response.fullname
                     this.bipuserID = response.userid
-
-                    const loginBtn = document.querySelector("#biploginbutton")
-                    const bipLogo = document.querySelector("#biplogo")
-                    if (loginBtn) {
-                        loginBtn.classList.remove('btn-info')
-                        loginBtn.classList.add('btn-success')
-                    }
-                    if (bipLogo) {
-                        bipLogo.style.filter = "hue-rotate(140deg)"
-                    }
 
 
                     this.fetchBipExams()
@@ -647,29 +652,7 @@ export default {
                                 this.bipnews = allPosts;
                                 
                                 // Toggle UI visibility
-                                let bipdiv = document.getElementById(`bipinfo`)    // the div is not existant if lt is disabled
-                                let eye = document.getElementById('eye')               // the div is not existant if lt is disabled
-
-                                if (this.BipInfoActive){
-                                    if (bipdiv && bipdiv.style.right == "0px"){
-                                        bipdiv.style.right = "-482px";
-                                        bipdiv.style.boxShadow = "-2px 1px 2px rgba(0,0,0,0)";
-                                    }
-                                    eye.classList.add('eyeopen');
-                                    eye.classList.add('darkgreen');
-                                    eye.classList.remove('eyeclose');
-                                    eye.classList.remove('darkred');
-                                    this.BipInfoActive = false; 
-                                }
-                                else {
-                                    bipdiv.style.right = "0px"
-                                    bipdiv.style.boxShadow = "-2px 1px 2px rgba(0,0,0,0.2)"; 
-                                    eye.classList.remove('eyeopen');
-                                    eye.classList.remove('darkgreen');
-                                    eye.classList.add('eyeclose');
-                                    eye.classList.add('darkred');
-                                    this.BipInfoActive = true;
-                                }
+                                this.BipInfoActive = !this.BipInfoActive;
                             }
                         })
                         .catch(err => { 
@@ -681,29 +664,7 @@ export default {
                                 this.bipnews = allPosts;
                                 
                                 // Toggle UI visibility
-                                let bipdiv = document.getElementById(`bipinfo`)
-                                let eye = document.getElementById('eye')
-
-                                if (this.BipInfoActive){
-                                    if (bipdiv && bipdiv.style.right == "0px"){
-                                        bipdiv.style.right = "-482px";
-                                        bipdiv.style.boxShadow = "-2px 1px 2px rgba(0,0,0,0)";
-                                    }
-                                    eye.classList.add('eyeopen');
-                                    eye.classList.add('darkgreen');
-                                    eye.classList.remove('eyeclose');
-                                    eye.classList.remove('darkred');
-                                    this.BipInfoActive = false; 
-                                }
-                                else {
-                                    bipdiv.style.right = "0px"
-                                    bipdiv.style.boxShadow = "-2px 1px 2px rgba(0,0,0,0.2)"; 
-                                    eye.classList.remove('eyeopen');
-                                    eye.classList.remove('darkgreen');
-                                    eye.classList.add('eyeclose');
-                                    eye.classList.add('darkred');
-                                    this.BipInfoActive = true;
-                                }
+                                this.BipInfoActive = !this.BipInfoActive;
                             }
                         });
                     });
@@ -711,29 +672,7 @@ export default {
                     this.bipnews = [];
                     
                     // Toggle UI visibility
-                    let bipdiv = document.getElementById(`bipinfo`)
-                    let eye = document.getElementById('eye')
-
-                    if (this.BipInfoActive){
-                        if (bipdiv && bipdiv.style.right == "0px"){
-                            bipdiv.style.right = "-482px";
-                            bipdiv.style.boxShadow = "-2px 1px 2px rgba(0,0,0,0)";
-                        }
-                        eye.classList.add('eyeopen');
-                        eye.classList.add('darkgreen');
-                        eye.classList.remove('eyeclose');
-                        eye.classList.remove('darkred');
-                        this.BipInfoActive = false; 
-                    }
-                    else {
-                        bipdiv.style.right = "0px"
-                        bipdiv.style.boxShadow = "-2px 1px 2px rgba(0,0,0,0.2)"; 
-                        eye.classList.remove('eyeopen');
-                        eye.classList.remove('darkgreen');
-                        eye.classList.add('eyeclose');
-                        eye.classList.add('darkred');
-                        this.BipInfoActive = true;
-                    }
+                    this.BipInfoActive = !this.BipInfoActive;
                 }
             })
             .catch(err => { console.warn(err) })
@@ -907,69 +846,34 @@ export default {
         },
 
 
-        /** Checks if the selected exam already exists and updates the start button accordingly. */
+        /** Looks up the typed exam name among the previous exams and updates the wizard state (resume / conflict / password). */
         async checkExistingExam(){
-            const examstart = document.getElementById('examstart')
-            const examPasswordDiv = document.getElementById('examPassword')
             const servernameLower = (this.servername || '').toLowerCase()
+            const previousExam = (this.previousExams || []).find(e => (e.examName || '').toLowerCase() === servernameLower)
+            this.existingExam = previousExam || null
 
-            for (let i = 0; i < this.previousExams.length; i++) {
-                const previousExam = this.previousExams[i] // current exam object
-                if ((previousExam.examName || '').toLowerCase() === servernameLower) {
-
-                    // BiP exam with same name: block if we are in the local tab
-                    if (previousExam.bip && this.activeTab !== 'bildungsportal') {
-                        this.backupdir = ''
-                        this.bipNameConflict = true
-                        if (examstart) examstart.classList.add('disabledstart')
-                        if (examPasswordDiv) examPasswordDiv.disabled = false
-                        return
-                    }
-
-                    if (!this.isExamVersionCompatible(previousExam)) {
-                        this.bipNameConflict = false
-                        this.backupdir = previousExam.backupdirectory || ''
-                        if (examstart) {
-                            examstart.innerHTML = this.$t("startserver.resume")
-                            examstart.classList.add('disabledstart')
-                        }
-                        if (examPasswordDiv) examPasswordDiv.disabled = false
-                        return
-                    }
-
-                    this.bipNameConflict = false
-                    this.password = ""
-                    this.passwordConfirm = ""
-                    this.advanced = false
-                    this.backupdir = previousExam.backupdirectory || ''
-                    let hasExamPassword = typeof previousExam.examPassword === 'string' && previousExam.examPassword.trim() !== ''
-
-                    if (hasExamPassword) {
-                        this.password = previousExam.examPassword
-                        this.passwordConfirm = previousExam.examPassword
-                        await this.$nextTick();
-
-                    }
-                    if (examstart) {
-                        examstart.innerHTML = this.$t("startserver.resume")
-                        if (!this.startBlocked) { examstart.classList.remove('disabledstart') }
-                    }
-                    if (examPasswordDiv){
-                        examPasswordDiv.disabled = hasExamPassword  // lock only if a real password is set
-                    }
-                    return
-                }
+            if (!previousExam) {
+                this.bipNameConflict = false
+                this.backupdir = ''
+                return
             }
 
-            // no match found
+            // BiP exam with same name: block if we are in the local tab
+            if (previousExam.bip && this.activeTab !== 'bildungsportal') {
+                this.backupdir = ''
+                this.bipNameConflict = true
+                return
+            }
+
             this.bipNameConflict = false
-            this.backupdir = ''
-            if (examstart) {
-                examstart.innerHTML = this.$t("startserver.start")
-                if (!this.startBlocked) { examstart.classList.remove('disabledstart') }
-            }
-            if (examPasswordDiv){
-                examPasswordDiv.disabled = false
+            this.backupdir = previousExam.backupdirectory || ''
+            if (!this.isExamVersionCompatible(previousExam)) return
+
+            this.password = ""
+            this.passwordConfirm = ""
+            if (typeof previousExam.examPassword === 'string' && previousExam.examPassword.trim() !== '') {
+                this.password = previousExam.examPassword
+                this.passwordConfirm = previousExam.examPassword
             }
         },
 
@@ -1018,12 +922,6 @@ export default {
             }
         },
 
-        toggleAdvanced(){
-            if (!this.advanced){
-                this.showPassword = false
-            }
-        },
-
         // Picks NXE1-encrypted student PDF, decrypts it with the entered exam password and saves the plain PDF.
         async decryptEncryptedPdf() {
             const prompt = await this.$swal.fire({
@@ -1060,8 +958,8 @@ export default {
             if (this.servername === "" ){
                 this.status(this.$t("startserver.emptyname"));
             }
-            else if (this.advanced && (this.password === "" || this.passwordConfirm === "" || this.passwordMismatch)){
-                this.status(this.$t("startserver.emptypw"));
+            else if (this.passwordMismatch){
+                this.status(this.$t("startserver.pwdmismatch"));
             }
             else {
                 // Block if a BiP exam with this name exists locally but we're in the local tab
@@ -1151,28 +1049,22 @@ export default {
                 }
             })
         },
-        //show status message
-        async status(text){  
-            const statusDiv = document.querySelector("#statusdiv");
-            statusDiv.textContent = text;
-            statusDiv.style.visibility = "visible";
-            this.fadeIn(statusDiv);
-            await this.sleep(2000);
-            this.fadeOut(statusDiv)
+        // show a short toast message
+        async status(text){
+            this.toast = String(text ?? '');
+            clearTimeout(this.toastTimer);
+            this.toastTimer = setTimeout(() => { this.toast = '' }, 3000);
         },
 
         // implementing a sleep (wait) function
         sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         },
-        handleKeyupEvent(e) {
-            this.servername = document.getElementById('servername').value;
-            this.checkExistingExam();
-        },
         // Shows a short hint next to the exam name field when a disallowed character is rejected or paste/drop is blocked.
         flashServernameCharsetHint() {
             this.showServernameCharsetHint = true;
-            if (this.servernameCharsetHintTimer) {
+            clearTimeout(this.toastTimer);
+        if (this.servernameCharsetHintTimer) {
                 clearTimeout(this.servernameCharsetHintTimer);
             }
             this.servernameCharsetHintTimer = setTimeout(() => {
@@ -1195,38 +1087,10 @@ export default {
                 }
             }
         },
-        // Function to add fade-in effect
-        fadeIn(element) {
-            element.classList.add('fade-in');
-            element.classList.remove('fade-out');
-        },
-
-        // Function to add fade-out effect
-        fadeOut(element) {
-            element.classList.add('fade-out');
-            element.classList.remove('fade-in');
-        },
-
-        showDescription(description) {
-            this.currentDescription = description;
-            this.showDesc = true;
-        },
-        hideDescription() {
-            this.showDesc = false;
-        },
 
     },
     async mounted() {  // when ready
         log.info('startserver @ mounted: next-exam ready!');
-        document.querySelector("#statusdiv").style.visibility = "hidden";  //do not show on first mount of ui
-        
-
-        if (this.prod) {  //clear input fields in production mode
-            document.querySelector("#servername").value = "";
-            document.querySelector("#pin").value = "";
-            document.querySelector("#password").value = "";
-        }
-      
         this.hostname = "localhost"
         this.checkDiscspace()
         await this.getPreviousExams()
@@ -1259,12 +1123,7 @@ export default {
         this.$i18n.locale = locale
         //console.log("locale:", systemLocale, locale)
 
-        // add event listener to exam input field to suppress all special chars
-        const servernameEl = document.getElementById("servername");
-        if (servernameEl) {
-            servernameEl.addEventListener("keypress", this.validateInput);
-            servernameEl.addEventListener("keyup", this.handleKeyupEvent);
-        }
+        this.$nextTick(() => document.getElementById('servername')?.focus());
     },
     beforeUnmount() {
         ipcRenderer.removeListener('bipToken', this.bipTokenHandler);
@@ -1274,467 +1133,49 @@ export default {
             clearTimeout(this.servernameCharsetHintTimer);
             this.servernameCharsetHintTimer = null;
         }
-        const servernameEl = document.getElementById("servername");
-        if (servernameEl) {
-            // should be safe for SPA unmount when element might already be gone
-            servernameEl.removeEventListener("keyup",  this.handleKeyupEvent);
-            servernameEl.removeEventListener("keypress",  this.validateInput);
-        }
     },
 }
 </script>
-
-
-
 <style>
-.active {
-    filter: contrast(100%) grayscale(100%) brightness(80%) !important;
-}
-.inactive {
-    filter: contrast(40%) grayscale(100%) brightness(130%) blur(0.6px) !important;
-}
-
+/* easter egg toggles on the copyleft swal */
+.active { filter: contrast(100%) grayscale(100%) brightness(80%) !important; }
+.inactive { filter: contrast(40%) grayscale(100%) brightness(130%) blur(0.6px) !important; }
 </style>
 
-
-
 <style scoped>
+.nx-start { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.nx-main { flex: 1 1 auto; overflow-y: auto; padding: 40px 24px 24px; }
+.nx-container { max-width: 880px; margin: 0 auto; }
+.nx-center { display: flex; justify-content: center; }
+.nx-wizard { max-width: 760px; margin: 0 auto; overflow: hidden; }
+.nx-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.nx-pill-btn { cursor: pointer; font-family: inherit; }
+.nx-pill-btn:hover { filter: brightness(.96); }
 
-.examname-input-row {
-    flex-wrap: nowrap;
-    align-items: center;
-    min-width: 0;
-}
+.nx-summary { margin: 0; border: 1px solid var(--nx-border); border-radius: 14px; background: var(--nx-surface-2); overflow: hidden; }
+.nx-summary > div { display: flex; gap: 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--nx-border); }
+.nx-summary > div:last-child { border-bottom: 0; }
+.nx-summary dt { width: 120px; flex-shrink: 0; color: var(--nx-muted); font-weight: 600; font-size: .88rem; }
+.nx-summary dd { margin: 0; min-width: 0; flex: 1 1 auto; }
 
-.servername-charset-hint {
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: min(480px, 42vw);
-    font-size: 0.8em;
-    font-weight: 500;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #198754;
-}
+.nx-options { margin-top: 12px; padding: 18px; border: 1px dashed #cfd5ea; border-radius: 14px; background: #fcfcff; }
+.nx-pw-row { display: flex; gap: 10px; align-items: center; }
+.nx-pw-row .nx-input { flex: 1 1 0; min-width: 0; }
+.nx-path { flex: 1 1 auto; min-width: 0; padding: 11px 14px; background: var(--nx-surface-2); border: 1px solid var(--nx-border); border-radius: 11px; font-size: .9rem; }
 
-.examname-bip-conflict-hint {
-    max-width: min(280px, 28vw);
-}
+.nx-recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.nx-exam { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.nx-exam-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; min-width: 0; }
+.nx-exam-head b { font-size: 1.02rem; }
+.nx-exam-meta { font-size: .84rem; display: flex; gap: 6px; }
+.nx-exam-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.nx-exam-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.nx-exam:hover .nx-exam-actions, .nx-exam:focus-within .nx-exam-actions { opacity: 1; }
+.nx-danger-hover:hover { color: var(--nx-danger); }
+.is-incompatible { opacity: .5; cursor: not-allowed; }
+.nx-news { padding: 12px 0; border-bottom: 1px solid var(--nx-border); }
+.nx-news:last-child { border-bottom: 0; }
 
-.servername-charset-hint-enter-active,
-.servername-charset-hint-leave-active {
-    transition: opacity 0.19s ease, transform 0.19s ease;
-}
-
-.servername-charset-hint-enter-from,
-.servername-charset-hint-leave-to {
-    opacity: 0;
-    transform: translateX(6px);
-}
-
-.disabledstart {
-    filter: contrast(100%) grayscale(60%) brightness(130%) blur(0.6px);
-    pointer-events: none; 
-}
-
-
-
-.cursornotallowed {
-    cursor: not-allowed !important;
-   
-}
-
-#description {
-    position: fixed;
-    left: 240px;
-    right: 0;
-    bottom: 0;
-    height: 1.5rem;
-    line-height: 1.5rem;
-    padding-top: 0;
-    padding-bottom: 0;
-    padding-right: 6rem;
-    z-index: 1500;
-    box-sizing: border-box;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.8em;
-    text-align: left;
-    margin: 0;
-    padding-left: 0.5rem;
-}
-
-#release {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    height: 1.5rem;
-    line-height: 1.5rem;
-    padding: 0 0.5rem;
-    z-index: 1500;
-    box-sizing: border-box;
-    font-size: 0.8em;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-#statusdiv {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    height: 1.5rem;
-    line-height: 1.5rem;
-    padding: 0 0.5rem;
-    z-index: 1501;
-    box-sizing: border-box;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: right;
-    margin: 0;
-    font-size: 0.8rem;
-}
-
-/* minimal scrollbar: thumb only, no track, no arrows */
-#sidebar-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-}
-#sidebar-scroll::-webkit-scrollbar {
-    width: 8px;
-}
-#sidebar-scroll::-webkit-scrollbar-track {
-    background: transparent;
-}
-#sidebar-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 4px;
-}
-#sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
-}
-#sidebar-scroll::-webkit-scrollbar-button {
-    display: none;
-}
-
-#content {
-    background-color: whitesmoke;
-    min-width: 680px;
-    margin-bottom: 1.5rem;
-    border-bottom-left-radius: 16px;
-}
-
-
-
-.exam-list-scroll {
-    min-height: 0;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0,0,0,0.2) transparent;
-}
-
-.bip-widget-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.37rem;
-}
-
-.bip-exam-card {
-    width: 300px;
-    background: #f8f9fa;
-    border: 1px solid;
-    border-radius: 5px;
-    padding: 7px 10px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    user-select: none;
-}
-
-/* match btn-cyan (Prüfung starten, local tab) */
-.bip-exam-card-local {
-    border-color: var(--bs-cyan);
-}
-
-.bip-exam-card-local:hover {
-    border-color: var(--bs-cyan);
-}
-
-/* match btn-success (Prüfung starten, Bildungsportal tab) */
-.bip-exam-card-bip {
-    border-color: var(--bs-success);
-}
-
-.bip-exam-card-bip:hover {
-    border-color: var(--bs-success);
-}
-
-.bip-exam-card-active {
-    background: #d1e7dd;
-}
-
-
-.bip-exam-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-}
-
-.bip-exam-name {
-    line-height: 1.3;
-    word-break: break-word;
-    text-align: left;
-    margin-right: auto; /* keep the PIN badge on the right */
-}
-
-.bip-status-pill {
-    flex-shrink: 0;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    margin-left: auto;
-}
-
-.bip-exam-info-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 3px;
-    margin-bottom: 5px;
-    font-size: 0.77em;
-}
-
-.bip-feature-badges {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 3px;
-}
-
-.bip-feature-badges .badge,
-.bip-exam-card-head .badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* exam type badges — all same neutral gray */
-.bip-type-badge,
-.bip-type-sus          { background: #e9ecef; color: #343a40; border: 1px solid #dee2e6; }
-
-.infobutton{
-    width: 221px;
-    min-width: 221px;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    background-color: whitesmoke;
-}
-
-.warning {
-    margin-top: 10px;
-    border-radius: 3px;
-    padding: 2px;
-    text-align: center;
-    font-size: 0.8em;
-    color: #fff;
-    background-color:  #dc3545c7;
-}
-
-#previous .printercheck {
-    margin-left:4px;
-    margin-top: 4px;
-    filter: saturate(100%) hue-rotate(90deg) ;
-}
-
-/* CSS classes for fade-in and fade-out */
-.fade-in {
-    animation: fadeInAnimation 2s;
-}
-.fade-out {
-    animation: fadeOutAnimation 2s forwards; /* 'forwards' keeps the final state after the animation */
-}
-@keyframes fadeInAnimation {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-@keyframes fadeOutAnimation {
-    from { opacity: 1; }
-    to { opacity: 0; visibility: hidden; }
-}
-
-
-.nobutton {
-   pointer-events: none;
-}
-
-
-
-#bipinfo {
-    position: fixed;
-    z-index: 100; 
-    width: 480px;
-    height: calc(100% - 1.5rem - 62px);
-    right: -482px;
-    top: 62px;
-    background-color: var(--bs-gray-100);
-    box-shadow: -2px 1px 2px rgba(0, 0, 0, 0);
-    transition: 0.3s;
-    padding: 6px;
-    padding-bottom: 100px;
-
-}
-
-#bipcheck {
-    position: absolute;
-    margin-left: -6px;
-    margin-top: 58px;
-    padding: 10px;
-    background-color: var(--bs-gray-100);
-    box-shadow: 1px 2px 2px rgba(0,0,0,0.2);
-    
-    width: 126px;
-    height: 44px;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-    cursor: pointer;
-    color:#616161;
-    transition: all 0.3s ease;
-    transform: rotate(90deg); 
-    transform-origin: top left; 
-}
-#bipcheck:hover{
-    background-color: var(--bs-gray-200);
-
-    height: 52px;
-   
-    box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
-    padding-top: 16px;
-
-}
-#bipcheck img{
-    vertical-align: bottom;
-
-}
-#bipcheck #eye {
-    width: 20px;
-    height: 20px;
-    background-size: cover;
-    display:inline-block;
-    vertical-align: text-bottom;
-}
-
-#bipcheck .eyeopen {
-    background-image: url('/src/assets/img/svg/eye-fill.svg');
-}
-#bipcheck .eyeclose {
-    background-image: url('/src/assets/img/svg/eye-slash-fill.svg');
-}
-
-
-#bipinfo .bipscrollarea {
-    height: calc(100vh - 1.5rem - 62px);
-    width: 468px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    position: absolute;
-    top: 0px;
-    padding-top: 20px;
-    padding-bottom: 20px;
-}
-
-#bipinfo .color-circle {
-  height: 10px;
-  width: 10px;
-  border-radius: 50%;
-  display: inline-block;
-  background-color: #0dcaf0;
-  margin-left:-5px;
-}
-
-.darkgreen {
-    filter: invert(36%) sepia(100%) saturate(2200%) hue-rotate(95deg) brightness(75%);
-}
-.darkred {
-    filter: invert(28%) sepia(99%) saturate(7476%) hue-rotate(345deg) brightness(65%);
-
-}
-#bipinfo .bipentry {
-    margin: 14px;
-    padding: 10px;
-    border-radius: 8px;
-    background-color:   rgba(238, 238, 250, 0.37);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    font-size: 0.8em;
-    cursor: pointer;
-}
-
-#bipinfo .bipentry:hover {
-  background-color:   rgba(238, 238, 250, 0.508);
-}
-
-.darkgreen {
-    filter: invert(36%) sepia(100%) saturate(2200%) hue-rotate(95deg) brightness(75%);
-}
-.darkred {
-    filter: invert(28%) sepia(99%) saturate(7476%) hue-rotate(345deg) brightness(65%);
-
-}
-#bipinfo .subject {
-  padding: 5px;
-  border: none;
-  background-color: transparent;
-  color: var(--bs-info-text-emphasis);
-  font-size: 1.1em;
-  display: inline-block;
- 
-}
-
-#bipinfo .message {
-    padding:  0px 10px 0px 10px;
-    border-radius: 0px;
-}
-#bipinfo .created {
-    padding: 2px;
-    padding-left: 0px;
-    margin:10px;
-    margin-top: 4px;
-    border-top: 1px solid var(--bs-cyan);
-    color: var(--bs-green);
-    border-radius: 0px;
-}
-
-.custom-swal2-icon {
-    margin: 3em auto 1em auto !important
-}
-
-.password-visibility-btn {
-    width: 40px;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-    padding: 0;
-}
-
-.password-visibility-btn:focus,
-.password-visibility-btn:active {
-    border: 0;
-    outline: 0;
-    box-shadow: none;
-}
-
-.password-visibility-icon {
-    opacity: 0.55;
-}
-
-#sidebar-bottom {
-    margin-bottom: 10px;
-}
-
-
+.nx-foot { flex-shrink: 0; padding: 10px 24px; text-align: center; font-size: .8rem; color: var(--nx-muted); }
+.nx-foot-link { cursor: pointer; }
 </style>

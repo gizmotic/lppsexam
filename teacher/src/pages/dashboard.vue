@@ -3,16 +3,18 @@
 
 <!-- Header START -->
 <div :key="0" class="w-100 p-3 text-white bg-dark text-left " style="position: relative; display: flex; align-items: center; justify-content: space-between; min-width: 1180px; height: 62px; z-index: 100;">
-    <span class="text-white m-1" style="flex-shrink: 0;">
-        <img src="/src/assets/img/svg/speedometer.svg" class="white me-2  " width="32" height="32" >
-        <span style="font-size:23px;" class="align-middle me-1 ">Next-Exam</span>
+    <span class="nx-dash-brand text-white m-1" style="flex-shrink: 0;">
+        <span class="nx-brand-mark">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        </span>
+        <span class="nx-dash-title">Next-Exam</span>
+        <span class="nx-pill nx-dash-exam" :title="$t('dashboard.name')">{{ $route.params.servername }}</span>
     </span>
 
     <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
         <div class="btn btn-sm btn-danger m-0 me-1 mt-0" data-e2e="stop-server" @click="stopserver()" @mouseover="showDescription($t('dashboard.exitexam'))" @mouseout="hideDescription"  style=" height:32px;"><img src="/src/assets/img/svg/stock_exit.svg" style="vertical-align:text-top;" class="" width="20" height="20" >&nbsp; {{$t('dashboard.stopserver')}}&nbsp; </div>
         <div v-if="!hostip?.hostip" id="adv" class="btn btn-danger btn-sm m-0  mt-1 me-1 " style="cursor: unset;">{{ $t("general.offline") }}</div>
         <div class="btn btn-sm btn-cyan m-0 me-1 mt-0" style=" padding:3px; height:32px; width:32px;" @click="showSetup()"  @mouseover="showDescription($t('dashboard.extendedsettings'))" @mouseout="hideDescription" ><img src="/src/assets/img/svg/settings-symbolic.svg" class="white-100" width="22" height="22" > </div>
-        <span class="align-middle ms-3" style="font-size:23px;">Dashboard</span>
     </div>
     
     <div v-if="serverstatus.useExamSections && !serverstatus.allowSectionSwitch" style="position: absolute; left:256px; bottom: 0; min-width: 550px; z-index: 0;">
@@ -1001,103 +1003,33 @@
     <div :key="7" id="content" class="fadeinslow p-3">
        
 
-        <!-- CONTROL BUTTONS START -->
-       <div class="control-buttons-container">
-        <div v-if="(serverstatus.exammode && reachableConnections == 1)" class="btn btn-danger control-button m-1 mt-0 text-start ms-0" data-e2e="end-exam" @click="endExam();hideDescription();" @mouseover="showDescription($t('dashboard.exitkiosk'))" @mouseout="hideDescription">
-            <img src="/src/assets/img/svg/shield-lock.svg" class="white control-button-icon" width="28" height="28"> 
-            <div class="control-button-label"> {{reachableConnections}} {{$t('dashboard.stopexamsingle')}} </div>
-        </div>
-        <div v-if="(serverstatus.exammode && reachableConnections != 1)" class="btn btn-danger control-button m-1 mt-0 text-start ms-0" data-e2e="end-exam" @click="endExam();hideDescription();" @mouseover="showDescription($t('dashboard.exitkiosk'))" @mouseout="hideDescription">
-            <img src="/src/assets/img/svg/shield-lock.svg" class="white control-button-icon" width="28" height="28"> 
-            <div class="control-button-label"> {{reachableConnections}} {{$t('dashboard.stopexam')}} </div>
-        </div>
-
-        <div v-if="(!serverstatus.exammode && reachableConnections == 1)"
-            @mouseover="showDescription(hasMandatoryBasematerialReady ? $t('dashboard.startexamdesc') : $t('dashboard.mandatoryBasematerialIncompleteHint'))"
-            @mouseout="hideDescription">
-            <div class="btn btn-teal control-button m-1 mt-0 text-start ms-0" data-e2e="start-exam" @click="startExam();hideDescription();" :class="!hasMandatoryBasematerialReady ? 'disabledgreen':''">
-                <img src="/src/assets/img/svg/shield-lock.svg" class="white control-button-icon" width="28" height="28"> 
-                <div class="control-button-label">{{reachableConnections}} {{$t('dashboard.startexamsingle')}}</div>
-            </div>
-        </div>
-
-        <div v-if="(!serverstatus.exammode && reachableConnections != 1)"
-            @mouseover="showDescription(hasMandatoryBasematerialReady ? $t('dashboard.startexamdesc') : $t('dashboard.mandatoryBasematerialIncompleteHint'))"
-            @mouseout="hideDescription">
-            <div class="btn btn-teal control-button m-1 mt-0 text-start ms-0" data-e2e="start-exam" @click="startExam();hideDescription();" :class="!hasMandatoryBasematerialReady ? 'disabledgreen':''">
-                <img src="/src/assets/img/svg/shield-lock.svg" class="white control-button-icon" width="28" height="28"> 
-                <div class="control-button-label">{{reachableConnections}} {{$t('dashboard.startexam')}}</div>
-            </div>
-        </div>
-
-        <div class="btn btn-cyan control-button m-1 mt-0 text-start ms-0" @click="fetchSubmissions(); loadFilelist(workdirectory); showExplorer = true; hideDescription();" @mouseover="showDescription($t('dashboard.showworkfolder'))" @mouseout="hideDescription">
-            <img src="/src/assets/img/svg/folder-open.svg" class="control-button-icon me-1" width="32" height="32">
-            <div class="control-button-label">{{$t('dashboard.workfolder')}}</div>
-        </div>
-        <div @mouseover="showDescription($t('examlog.buttondesc'))" @mouseout="hideDescription" class="btn btn-gray-dark control-button m-1 mt-0 ms-0 text-start" @click="showExamLog = true">
-            <img src="/src/assets/img/icons/log.png" class="white control-button-icon me-1" width="32" height="32">
-            <div class="control-button-label">{{ $t('examlog.button') }}</div>
-        </div>
-        <div @mouseover="showDescription($t('submissionsview.buttondesc'))" @mouseout="hideDescription" class="btn btn-gray-dark control-button m-1 mt-0 ms-0 text-start" @click="fetchSubmissions(); showSubmissionsView = true">
-            <img src="/src/assets/img/svg/dialog-ok-apply.svg" class="control-button-icon me-1" width="32" height="32" style="filter: invert(55%) sepia(40%) saturate(300%) hue-rotate(140deg) brightness(1.1)">
-            <div class="control-button-label">{{ $t('submissionsview.buttoncontrol') }}</div>
-        </div>
-        <div v-if="bipToken && serverstatus.bip" @mouseover="showDescription($t('dashboard.bipinfo'))" @mouseout="hideDescription" class="btn control-button control-button-bip-access m-1 mt-0 ms-0 text-start" :class="bipStatus === 'closed' ? 'btn-warning' : 'btn-teal'" @click="toggleBipStatus">
-            <img src="/src/assets/img/svg/globe.svg" class="control-button-icon me-1" width="32" height="32">
-            <div class="control-button-label">{{ bipJoinStatusLabel() }}</div>
-        </div>
-        </div>
-
- 
-
-        <div class="tab-buttons-container">
-            <div v-if="hasOfflineStudents"
-                class="btn tab-button tab-button-offline"
-                @click="kickAllOffline();hideDescription();"
-                @mouseover="showDescription($t('dashboard.kickalloffline'))"
-                @mouseout="hideDescription">
-                <img src="/src/assets/img/svg/list-remove-user.svg" width="24" height="24">
-            </div>
-
-            <div class="btn btn-dark tab-button"
-                @click="sendFiles('all');hideDescription();"
-                @mouseover="showDescription($t('dashboard.sendfile'))" 
-                @mouseout="hideDescription">
-                <img src="/src/assets/img/svg/document-send.svg" width="24" height="24">
-            </div>
-
-            <div class="btn btn-dark tab-button" data-e2e="collect-files"
-                @click="getFiles('all', true, false, true); hideDescription();"
-                @mouseover="showDescription($t('dashboard.getfile'))"
-                @mouseout="hideDescription">
-                <img src="/src/assets/img/svg/edit-download.svg" width="24" height="24">
-            </div>
-
-            <div v-if="serverstatus.screenslocked" 
-                class="btn btn-danger tab-button" 
-                @mouseover="showDescription($t('dashboard.unlock'))"
-                @mouseout="hideDescription"
-                @click="lockscreens(false);hideDescription();">
-                <img src="/src/assets/img/svg/eye-fill.svg" class="white" width="24" height="24">
-            </div>
-
-            <div v-else 
-                class="btn btn-dark tab-button" 
-                @click="lockscreens(true);hideDescription();" 
-                @mouseover="showDescription($t('dashboard.lock'))" 
-                @mouseout="hideDescription">
-                <img src="/src/assets/img/svg/eye-slash-fill.svg" class="white" width="24" height="24">
-            </div>
-
-            <div class="btn btn-dark tab-button" 
-                @mouseover="showDescription($t('dashboard.del'))" 
-                @mouseout="hideDescription" 
-                @click="delfolderquestion">
-                <img src="/src/assets/img/svg/edit-delete.svg" width="24" height="24">
-            </div>
-
-        </div>
-        <!-- CONTROL BUTTONS END -->
+        <!-- GUIDED FLOW BAR START -->
+        <ExamFlowBar
+            :exammode="!!serverstatus.exammode"
+            :has-started="examEverStarted"
+            :material-ready="hasMandatoryBasematerialReady"
+            :reachable="reachableConnections"
+            :pin="serverstatus.pin"
+            :screens-locked="!!serverstatus.screenslocked"
+            :has-offline="hasOfflineStudents"
+            @start="startExam(); hideDescription();"
+            @stop="endExam(); hideDescription();"
+            @collect="getFiles('all', true, false, true); hideDescription();"
+            @send="sendFiles('all'); hideDescription();"
+            @submissions="fetchSubmissions(); showSubmissionsView = true"
+            @folder="fetchSubmissions(); loadFilelist(workdirectory); showExplorer = true; hideDescription();"
+            @log="showExamLog = true"
+            @lock="(lock) => { lockscreens(lock); hideDescription(); }"
+            @kick-offline="kickAllOffline(); hideDescription();"
+            @clean="delfolderquestion"
+        >
+            <template #extra>
+                <button v-if="bipToken && serverstatus.bip" type="button" class="nx-btn nx-btn--sm" :class="bipStatus === 'closed' ? 'nx-btn--danger' : ''" @click="toggleBipStatus">
+                    {{ bipJoinStatusLabel() }}
+                </button>
+            </template>
+        </ExamFlowBar>
+        <!-- GUIDED FLOW BAR END -->
 
 
         <!-- LOG START -->
@@ -1328,6 +1260,7 @@ import SubmissionsView from '../components/SubmissionsView.vue'
 import DashboardExplorer from '../components/DashboardExplorer.vue'
 import StudentEditorTimelineDiffViewer from '../components/StudentEditorTimelineDiffViewer.vue'
 import StudentView from '../components/StudentView.vue'
+import ExamFlowBar from '../components/ExamFlowBar.vue'
 import examEventBus from '../utils/examEventBus.js'
 import log from 'electron-log/renderer'
 import { isStudentReachable, countReachableStudents } from '../utils/studentPresence.js'
@@ -1353,6 +1286,7 @@ class EmptyWidget {
 
 export default {
     components: {
+        ExamFlowBar,
         draggable: VueDraggableNext,
         MaterialsList: MaterialsList,
         WebviewPane: WebviewPane,
@@ -1569,6 +1503,10 @@ computed: {
     },
     hasMandatoryBasematerialReady() {
         return this.sectionsMissingMandatoryBasematerial().length === 0
+    },
+    // true once an exam was started in any section (flow bar then shows the hand-in phase after it ends)
+    examEverStarted() {
+        return Object.values(this.serverstatus.examSections || {}).some((sec) => Number(sec?.startTs || 0) > 0)
     },
     lockInExammode() {
         //if sections are disabled, return true if exammode is active
@@ -4818,6 +4756,17 @@ hr {
 
 
 
+
+
+/* ================= NX skin (modern look; structure/logic unchanged) ================= */
+.nx-dash-brand { display: inline-flex; align-items: center; gap: 10px; font-family: 'Inter', system-ui, sans-serif; }
+.nx-dash-title { font-size: 1.15rem; font-weight: 700; letter-spacing: -.01em; }
+.nx-dash-exam { background: rgba(255,255,255,.1); color: #e8ebff; border-color: rgba(255,255,255,.18); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 1.5; }
+.bg-dark.w-100.p-3 { background: linear-gradient(90deg, #141a2e, #1c2342) !important; }
+.sidebar-root.bg-dark { background: #141a2e !important; border-top-right-radius: 18px; }
+#content { background: radial-gradient(900px 420px at 0% 0%, rgba(79,70,229,.08), transparent 60%), #f4f6fb !important; font-family: 'Inter', system-ui, sans-serif; padding-top: 16px !important; padding-left: 16px !important; }
+.studentwidget { border-radius: 14px; box-shadow: 0 1px 2px rgba(20,26,46,.06), 0 6px 18px rgba(20,26,46,.08); background: #fff !important; }
+.studentwidget-empty { border: 1px dashed #d5daea !important; box-shadow: none; background: transparent !important; }
 </style>
 
 

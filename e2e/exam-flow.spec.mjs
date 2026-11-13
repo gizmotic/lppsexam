@@ -289,6 +289,7 @@ for (const mode of modes) {
             await startupDialog.locator('.swal2-confirm').click();
             await expect(startupDialog).toBeHidden();
           }
+          await teacherWindow.locator('#examnext').click();   // wizard step 1 -> 2
           await teacherWindow.locator('#examstart').click();
           await expect(teacherWindow.locator('#studentslist')).toBeVisible();
           await teacherWindow.locator('[data-e2e="exam-mode-toggle"]').click();

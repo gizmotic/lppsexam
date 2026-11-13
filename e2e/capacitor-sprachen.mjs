@@ -184,6 +184,7 @@ try {
         await startupDialog.locator('.swal2-confirm').click();
         await startupDialog.waitFor({ state: 'hidden' });
     }
+    await teacherWindow.locator('#examnext').click();
     await teacherWindow.locator('#examstart').click();
     await teacherWindow.locator('#studentslist').waitFor();
     await teacherWindow.locator('[data-e2e="exam-mode-toggle"]').click();
