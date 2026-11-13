@@ -4,6 +4,7 @@ import JreHandler from './jre-handler.js';
 import platformDispatcher from './platformDispatcher.js';
 import { exec } from 'child_process';
 import os from 'os';
+import config from '../../../src/utils/config.js';
 
 const __dirname = import.meta.dirname;
 const publicBase = () => platformDispatcher.publicBase;
@@ -22,6 +23,10 @@ class LanguageToolServer {
      }
  
      startServer() {
+        if (config.languageHelp === false) {
+            log.info('lt-server @ startserver: slim build without LanguageTool - not starting');
+            return;
+        }
          if (this.languageToolProcess && !this.languageToolProcess.killed) {
              log.warn('lt-server @ startserver: LanguageTool server is already running.');
              return; // Prevents restarting when the server is already running

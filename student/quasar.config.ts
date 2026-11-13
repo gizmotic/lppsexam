@@ -55,7 +55,11 @@ const productName = process.env.PRODUCT_NAME || pkg.name || 'Next-Exam-Student';
 const version = process.env.VERSION || pkg.version || '2.1.0';
 const buildNumber = process.env.BUILD_NUMBER || '4';
 const artifactDate = buildDate;
-const artifactNamePattern = `${productName}_${version}.${buildNumber}_${artifactDate}_\${arch}.\${ext}`;
+// LANGUAGE_HELP=false -> slim variant: no bundled LanguageTool and no Java runtimes (~215 MB smaller)
+const languageHelp = process.env.LANGUAGE_HELP !== 'false';
+const variantSuffix = languageHelp ? '' : '_ohneSprachhilfe';
+const slimExcludes = languageHelp ? [] : ['!public/LanguageTool/**', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-lin/**', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**'];
+const artifactNamePattern = `${productName}_${version}.${buildNumber}_${artifactDate}${variantSuffix}_\${arch}.\${ext}`;
 const signEnabled = process.env.SIGN !== 'false';
 // electron-builder builds every entry in win.target; NXE_EB_WIN_TARGET selects portable vs msi (see package.json scripts)
 const winEbTarget = process.env.NXE_EB_WIN_TARGET === 'both'
@@ -504,7 +508,7 @@ export default defineConfig(( ctx: any ) => {
           icon: 'public/icons/256x256.png',
           artifactName: artifactNamePattern,
           // Quasar UnPackaged root has electron-main.js, index.html, preload/, assets/ – include all, exclude other platforms’ JRE
-          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes],
+          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes, ...slimExcludes],
         },
         mac: {
           icon: 'public/icons/icon.png',
@@ -515,7 +519,7 @@ export default defineConfig(( ctx: any ) => {
           entitlementsInherit: 'scripts/entitlements.mac.plist',
           category: 'public.app-category.utilities',
           target: { target: 'dmg', arch: macEbArch },
-          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-lin/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes],
+          files: ['**/*', '!public/minimal-jre-11-win/**', '!public/minimal-jre-11-lin/**', '!node_modules/koffi/**', '!node_modules/@koromix/**', ...rendererOnlyAsarExcludes, ...slimExcludes],
         },
         dmg: { sign: false },
         portable: { useZip: true, unpackDirName: 'next-exam-student', splashImage: 'public/splash.bmp' },
@@ -530,7 +534,7 @@ export default defineConfig(( ctx: any ) => {
           icon: 'public/icons/icon.ico',
           target: winEbTarget,
           artifactName: artifactNamePattern,
-          files: ['**/*', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!public/minimal-jre-11-lin/**', ...rendererOnlyAsarExcludes],
+          files: ['**/*', '!public/minimal-jre-11-mac/**', '!public/minimal-jre-11-mac-arm64/**', '!public/minimal-jre-11-lin/**', ...rendererOnlyAsarExcludes, ...slimExcludes],
           // SIGN env (SIGN !== 'false'): signAndEditExecutable gates signing; Azure Trusted Signing auth comes from AZURE_* env vars (OIDC in CI)
           signAndEditExecutable: signEnabled,
           // electron-builder only warns on signing failures; fail the build instead of shipping unsigned artifacts

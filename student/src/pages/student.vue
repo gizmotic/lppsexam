@@ -846,8 +846,10 @@ export default {
                     <div id="spellcheckSection" style="text-align: left; margin-left: 16px; display: block;">
                         <div style="${isIOS() ? 'display: none;' : ''}">
                             <h6>${this.$t("student.spellcheck")}</h6>
+                            <div style="${window.config?.languageHelp === false ? 'display: none;' : ''}">
                             <input class="form-check-input" type="checkbox" id="checkboxLT">
                             <label class="form-check-label" for="checkboxLT" style="font-size: 1rem; font-weight: 500;"> LanguageTool ${this.$t("student.activate")} </label> <br>
+                            </div>
                             <input class="form-check-input" type="checkbox" id="checkboxsuggestions">
                             <label class="form-check-label" for="checkboxsuggestions" style="font-size: 1rem; font-weight: 500;"> ${this.$t("student.suggest")} </label><br><br>
                         </div>

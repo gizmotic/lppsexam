@@ -962,8 +962,10 @@ export default {
         },
         showLanguageToolSidebar() {
             // returns true if LanguageTool sidebar should be visible
-            if (this.privateSpellcheck?.activated) return true;
             const cfg = this.getEditorExamConfig();
+            // slim build ("ohne Sprachhilfe"): only usable with an external LanguageTool host
+            if (window.config?.languageHelp === false && !cfg?.languagetoolhost) return false;
+            if (this.privateSpellcheck?.activated) return true;
             return !!cfg?.languagetool;
         },
         focusLockReasonLine() {
@@ -2356,6 +2358,9 @@ export default {
             const cfg = this.getEditorExamConfig();
             if (!cfg || !cfg.languagetool) {
                 return false;
+            }
+            if (window.config?.languageHelp === false && !cfg.languagetoolhost) {
+                return false;   // slim build: no local LanguageTool bundled
             }
             if (this.ltRunning && !force) {
                 return true;

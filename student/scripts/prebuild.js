@@ -39,6 +39,7 @@ const config = {
     development: ${process.env.DEVELOPMENT},  // disable kiosk mode on exam mode and other stuff (autofill input fields)
     showdevtools: ${process.env.SHOWDEVTOOLS},
     useBundledJRE: ${process.env.USE_BUNDLED_JRE},
+    languageHelp: ${process.env.LANGUAGE_HELP !== 'false'},   // false = slim build without bundled LanguageTool/JRE
     bipIntegration: ${process.env.BIP_INTEGRATION},
     bipDemo: ${process.env.BIP_DEMO},
     bipApiUrl: '${process.env.BIP_API_URL}',
