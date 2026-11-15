@@ -355,6 +355,7 @@ export class Avatar {
       }
       const mesh = this._skinned(g, this._material(slot, proxy.meta), 'Part_' + slot);
       if (slot === 'brows' || slot === 'lashes') { mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = 2; }
+      if (slot === 'hair' && proxy.gen) mesh.castShadow = false;   // thin overlapping clumps shadow each other as blocky patches (shadow acne)
       if (slot === 'glasses') mesh.renderOrder = 3;
       const part = { id, mesh, proxy, P: new Float32Array(proxy.nP * 3) };
       if (slot === 'hair' && CONFIG.hairSoftPass && !proxy.gen) {
