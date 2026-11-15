@@ -480,7 +480,7 @@ export class Avatar {
     const underCap = (A, i) => {
       const dx = A[3 * i] - CX, dy = A[3 * i + 1] - CY, dz = A[3 * i + 2] - CZ, r = Math.hypot(dx, dy, dz) || 1;
       const th = Math.asin(Math.max(-1, Math.min(1, dy / r))) * 57.2958, aphi = Math.abs(Math.atan2(dx, dz)) * 57.2958;
-      return th > CAPEDGE(aphi) - 2;
+      return th > CAPEDGE(aphi) + 6;   // hair stays up to 6 deg under the cap edge: the cap covers the jagged cut
     };
     const cullCap = (part, cap) => {
       const src = part.proxy.idx; let idx = src;
