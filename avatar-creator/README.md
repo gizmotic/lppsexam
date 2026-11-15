@@ -45,6 +45,6 @@ Die gepackten Assets liegen fertig in `public/assets` (25,7 MB). Neu erzeugen:
 MH_DATA=<makehuman>/makehuman/data MH_MIRROR=<makehuman-data>/public/data npm run assets
 ```
 
-Vorschaubilder neu rendern (Dev-Server muss laufen): `node tools/make-thumbs.mjs`. Build für Hoster, die kein `.bin` ausliefern: `node tools/build-page.mjs` (→ `dist-page/`).
+Vorschaubilder neu rendern (Dev-Server muss laufen): `node tools/make-thumbs.mjs`. Build für Hoster, die kein `.bin` ausliefern: `node tools/build-page.mjs` (→ `dist-page/`), Probe im abgeschotteten Rahmen: `node tools/sandbox-check.mjs`.
 
 Quellen und Lizenzen: [ASSETS.md](ASSETS.md). Stand und Entscheidungen: [STATUS.md](STATUS.md), [DECISIONS.md](DECISIONS.md).

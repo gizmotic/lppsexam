@@ -30,7 +30,8 @@ siehe unten. Offen ist Qualität an Haaren und Nahaufnahme, kein fehlendes Kerns
 - **60 fps auf echter Grafikkarte**: nicht gemessen. Hier lief nur Software-Rendering.
 - Import des GLB in Blender, Unity, Unreal: nicht geprüft – nur three.js-GLTFLoader.
 - Safari, Firefox, Touch-Geräte: nicht geprüft. Das Handy-Layout ist angelegt und einmal im Bild kontrolliert.
-- Die veröffentlichte Vorschauseite: hochgeladen, aber in ihrer eingebetteten Umgebung nicht selbst geöffnet.
+- Die veröffentlichte Vorschauseite: auf claude.ai selbst nicht geöffnet. Derselbe Build läuft lokal in einem abgeschotteten
+  Rahmen ohne eigene Herkunft fehlerfrei (`node tools/sandbox-check.mjs`).
 - Lizenz-Abgleich der gespiegelten Assets: siehe ASSETS.md.
 
 ## Bekannte Schwächen

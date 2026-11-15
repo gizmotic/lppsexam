@@ -15,6 +15,9 @@ export function download(blob, name) {
 export async function exportGLB(app, opts = {}) {
   const { avatar, skin, animator } = app;
   const withAnim = (opts.animations ?? true) && CONFIG.glbAnimations;
+  // every texture must be in memory: an export started right after a change would otherwise hit a half-loaded material
+  await avatar.texturesReady();
+  for (let i = 0; i < 100 && !skin.ready; i++) await new Promise((r) => setTimeout(r, 50));
   avatar.update(); skin.render();
   // rest pose
   animator.mixer.stopAllAction();

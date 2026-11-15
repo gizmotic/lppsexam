@@ -74,6 +74,7 @@ export class Avatar {
     this.dirty = { shape: true };
     this.parts = new Map();          // slot -> { id, mesh, proxy, P }
     this.texCache = new Map();
+    this.loading = new Set();        // texture loads in flight (awaited before a GLB export)
     this.onRebuilt = null;
     this._partsVersion = 0;
     this._tmp = new Float32Array(D.nV * 3);
@@ -165,12 +166,12 @@ export class Avatar {
     if (t) return t;
     if (!gray) {
       t = new THREE.Texture();
-      loadImage(file).then((img) => { t.image = img; t.needsUpdate = true; });
+      this._track(loadImage(file).then((img) => { t.image = img; t.needsUpdate = true; }));
     } else {
       // luminance-normalised copy so material.color can tint it (survives GLB export as baseColorFactor)
       const canvas = document.createElement('canvas');
       t = new THREE.Texture();
-      loadImage(file).then((img) => {
+      this._track(loadImage(file).then((img) => {
         // 2x smooth upscale: the alpha edge of the 512px source becomes a rounder contour
         const W = img.width * 2, H = img.height * 2;
         canvas.width = W; canvas.height = H;
@@ -205,13 +206,16 @@ export class Avatar {
           for (let i = 0; i < a.length; i++) { const k = Math.min(1, Math.max(0, (a[i] - 0.3) / 0.3)); d[4 * i + 3] = 255 * k * k * (3 - 2 * k); }
         }
         ctx.putImageData(id, 0, 0); t.image = canvas; t.needsUpdate = true;
-      });
+      }));
     }
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     t.anisotropy = Math.min(8, this.maxAniso);
     this.texCache.set(key, t);
     return t;
   }
+
+  _track(promise) { this.loading.add(promise); promise.catch((e) => console.error(e)).finally(() => this.loading.delete(promise)); return promise; }
+  async texturesReady() { while (this.loading.size) await Promise.allSettled([...this.loading]); }
 
   // iris recoloured from the one base texture: saturated pixels are iris, their value carries the fibre detail
   eyeTexture(hex) {
@@ -237,7 +241,7 @@ export class Avatar {
     if (!this._eyeImg) {
       this._eyeImg = loadImage('tex/eye_base.webp');
     }
-    this._eyeImg.then(paint);
+    this._track(this._eyeImg.then(paint));
     return t;
   }
 
