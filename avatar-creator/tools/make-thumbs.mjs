@@ -20,6 +20,8 @@ const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7),
 for (const it of items) {
   if (only && !it.id.startsWith(only)) continue;
   if (missing && fs.existsSync(path.join(OUT, it.id + '.webp'))) continue;
+  const fresh = +((process.argv.find((a) => a.startsWith('--skip-fresh=')) || '').slice(13)) || 0;   // resume: skip files written in the last N minutes
+  if (fresh && fs.existsSync(path.join(OUT, it.id + '.webp')) && Date.now() - fs.statSync(path.join(OUT, it.id + '.webp')).mtimeMs < fresh * 60000) continue;
   const female = /^(female|f_)/.test(it.id) || it.tags.includes('female');
   const gender = it.id.startsWith('male') ? 1 : female ? 0 : 0.35;
   await page.evaluate(async ({ it, gender, frame }) => {
@@ -32,7 +34,7 @@ for (const it of items) {
     await __app.partsChanged(); __app.colorsChanged(); __app.shapeChanged(); __app.setAnim('pose'); __app.frame(frame, true);
   }, { it, gender, frame: FRAME[it.slot] });
   await page.waitForTimeout(450);
-  await sharp(await page.screenshot()).resize(176, 250).webp({ quality: 84 }).toFile(path.join(OUT, it.id + '.webp'));
+  await sharp(await page.screenshot({ timeout: 240000 })).resize(176, 250).webp({ quality: 84 }).toFile(path.join(OUT, it.id + '.webp'));
 }
 await browser.close();
 console.log('thumbnails', items.length, '->', OUT, (fs.readdirSync(OUT).reduce((s, f) => s + fs.statSync(path.join(OUT, f)).size, 0) / 1e3).toFixed(0) + ' kB');
