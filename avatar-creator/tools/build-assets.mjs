@@ -285,6 +285,18 @@ function components(nP, faces, pos) {
   return Array.from({ length: nP }, (_, i) => find(i));
 }
 
+// per-part names (suits are split, so the catalogue label alone is not enough) and near-duplicates to leave out
+const LABELS = {
+  male_casualsuit02_top: 'Pullover blau', male_casualsuit03_top: 'Streifenhemd', male_casualsuit04_top: 'T-Shirt blau', male_casualsuit05_top: 'Feldjacke',
+  male_casualsuit06_top: 'T-Shirt weiß', male_elegantsuit01_top: 'Sakko', female_casualsuit01_top: 'T-Shirt tailliert', female_casualsuit02_top: 'T-Shirt locker',
+  female_elegantsuit01_top: 'Streifenbluse', female_sportsuit01_top: 'Sport-Top', female_top_01: 'Bustier', sleeveless: 'Bluse ärmellos', vnecktop: 'V-Top',
+  male_casualsuit02_bottom: 'Jeans hell', female_casualsuit01_bottom: 'Jeans schmal', male_elegantsuit01_bottom: 'Anzughose', female_casualsuit02_bottom: 'Jeans-Hotpants',
+  female_elegantsuit01_bottom: 'Bleistiftrock', female_sportsuit01_bottom: 'Leggings', tightjeans: 'Jeans dunkel',
+  male_casualsuit01: 'Hemd & Jeans', male_worksuit01: 'Latzhose', f_dress_01: 'Kleid dunkelrot', f_dress_02: 'Sommerkleid', f_dress_03: 'Abendkleid', f_dress_04: 'Neckholder',
+  shoes01: 'Leder braun', shoes02: 'Trekking', shoes03: 'Stiefeletten', shoes04: 'Leder schwarz', shoes05: 'Sneaker weiß', shoes06: 'Sneaker blau',
+};
+const SKIP = new Set(['male_casualsuit03_bottom', 'male_casualsuit04_bottom', 'male_casualsuit05_bottom', 'male_casualsuit06_bottom']);   // same jeans as 02
+
 const proxies = {};
 const credits = new Set();
 for (const [cat, name, slot, label, credit] of CATALOG) {
@@ -324,21 +336,26 @@ for (const [cat, name, slot, label, credit] of CATALOG) {
   }
   for (const part of parts) {
     const id = id0 + part.suffix;
+    if (SKIP.has(id)) continue;
     const remap = new Int32Array(nP).fill(-1); const ref = [], bary = [], off = []; let lo = 1e9, hi = -1e9;
     for (let i = 0; i < nP; i++) {
       if (part.sel && !part.sel(i)) continue;
       remap[i] = ref.length / 3;
-      ref.push(...j.ref_vIdxs[i]); bary.push(...j.weights[i]); off.push(...j.offsets[i]);
-      lo = Math.min(lo, j.vertices[3 * i + 1]); hi = Math.max(hi, j.vertices[3 * i + 1]);
+      const r = j.ref_vIdxs[i], w = j.weights[i];
+      ref.push(...r); bary.push(...w); off.push(...j.offsets[i]);
+      // height of this vertex when fitted to the base mesh (the frame the hide mask lives in)
+      const y = w[0] * base.v[3 * r[0] + 1] + w[1] * base.v[3 * r[1] + 1] + w[2] * base.v[3 * r[2] + 1] + j.offsets[i][1];
+      lo = Math.min(lo, y); hi = Math.max(hi, y);
     }
     const pf = faces.filter((f) => f.every(([v]) => remap[v] >= 0)).map((f) => f.map(([v, u]) => [remap[v], u]));
     // a split part only hides the body verts inside its own height band
-    const pdel = part.sel ? del.filter((v) => base.v[3 * v + 1] >= lo - 0.15 && base.v[3 * v + 1] <= hi + 0.15) : del;
+    // a split part hides only the body it really covers: inside its own height band, a little in from the rim
+    const pdel = part.sel ? del.filter((v) => base.v[3 * v + 1] >= lo + 0.1 && base.v[3 * v + 1] <= hi - 0.1) : del;
     const meta = await writeProxy(id, { ref, bary, off, faces: pf, uvSrc: j.uvs[0], del: pdel });
     // own rendered thumbnail if present, else the bundled preview
     const thumb = `thumbs/${id}.webp`;
     if (!fs.existsSync(path.join(OUT, thumb))) await tex(path.join(dir, name + '.thumb.png'), thumb, { size: 128, q: 80 });
-    proxies[id] = { ...meta, slot: part.slot, label, map: texDiff, normal: texNorm, thumb, credit, tags: m.tags || [] };
+    proxies[id] = { ...meta, slot: part.slot, label: LABELS[id] || label, map: texDiff, normal: texNorm, thumb, credit, tags: m.tags || [] };
   }
 }
 

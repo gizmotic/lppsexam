@@ -27,7 +27,7 @@ Baut die Produktionsversion und lässt die 9 End-to-End-Tests dagegen laufen.
 | Gesicht | Kopfform, Stirn, Augen (+ freie Augenfarbe, Wimpern), Augenbrauen (12 Formen, Farbe), Nase, Mund, Wangen, Kinn & Kiefer, Ohren, Hals – 139 Regler |
 | Haut | 20 Hauttypen, Hautton, Falten, Sommersprossen (Gesicht/Körper), Punkterl per Klick, Lippen, Rouge, Lidschatten, Bartschatten |
 | Haare | 10 Frisuren + Glatze, freie Haarfarbe |
-| Kleidung | 18 Oberteile, 14 Hosen/Röcke, 10 Kleider/Outfits, 7 Paar Schuhe, jeweils umfärbbar; Unterwäsche-Grundschicht |
+| Kleidung | 18 Oberteile, 10 Hosen/Röcke, 10 Kleider/Outfits, 7 Paar Schuhe, jeweils umfärbbar; Unterwäsche-Grundschicht |
 | Deko | 3 Hüte, Brille, Armstulpen, Tattoos per Klick (16 Motive) |
 | Bewegung | Stehen, Winken, Gehen, Tanzen, A-Pose – mit Blinzeln und Lächeln |
 | Export | GLB (163 Knochen, Skinning, 6 Mimik-Morphs, 4 Animationen, Texturen), PNG-Foto, Avatar als JSON speichern/laden |

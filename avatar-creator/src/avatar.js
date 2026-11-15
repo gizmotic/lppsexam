@@ -38,6 +38,34 @@ function computeNormals(P, nP, idx, vmap, out, tmp) {
   }
 }
 
+// Tiling micro-relief for skin (pores and fine creases); the 512px colour source carries none.
+function makePoreNormalMap(size = 256, repeat = 46) {
+  let seed = 11; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const h = new Float32Array(size * size);
+  for (let n = 0; n < 2600; n++) {                       // pores: small pits
+    const cx = rnd() * size, cy = rnd() * size, r = 1.1 + rnd() * 1.6, depth = 0.5 + rnd() * 0.5;
+    for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) {
+      const d = Math.hypot(x, y) / r; if (d > 1.6) continue;
+      const i = ((Math.round(cy) + y + size) % size) * size + ((Math.round(cx) + x + size) % size);
+      h[i] -= depth * Math.exp(-d * d * 2.2);
+    }
+  }
+  for (let n = 0; n < 420; n++) {                        // fine creases: short shallow lines
+    let x = rnd() * size, y = rnd() * size; const a = rnd() * Math.PI, len = 8 + rnd() * 22, dx = Math.cos(a), dy = Math.sin(a);
+    for (let k = 0; k < len; k++) { const i = ((Math.round(y) + size) % size) * size + ((Math.round(x) + size) % size); h[i] -= 0.35; x += dx; y += dy; }
+  }
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d'), id = ctx.createImageData(size, size), H = (x, y) => h[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const nx = (H(x - 1, y) - H(x + 1, y)) * 1.4, ny = (H(x, y - 1) - H(x, y + 1)) * 1.4, l = Math.hypot(nx, ny, 1), i = 4 * (y * size + x);
+    id.data[i] = (nx / l * 0.5 + 0.5) * 255; id.data[i + 1] = (-ny / l * 0.5 + 0.5) * 255; id.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; id.data[i + 3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
 export class Avatar {
   constructor(D, state, skinTexture, renderer) {
     this.D = D; this.state = state; this.renderer = renderer;
@@ -91,6 +119,10 @@ export class Avatar {
       map: skinTexture, roughness: 0.52, metalness: 0, specularIntensity: 0.45,
       sheen: 0.14, sheenRoughness: 0.5, sheenColor: new THREE.Color(1.0, 0.62, 0.5),
     });
+    if (CONFIG.skinDetailNormal) {
+      this.skinMaterial.normalMap = makePoreNormalMap(); this.skinMaterial.normalMap.anisotropy = Math.min(8, this.maxAniso);
+      this.skinMaterial.normalScale.set(0.32, 0.32);
+    }
     this.body = this._skinned(g, this.skinMaterial, 'Body');
     this.root.add(this.body);
   }
@@ -139,10 +171,13 @@ export class Avatar {
       t = new THREE.Texture();
       const img = new Image();
       img.onload = () => {
-        canvas.width = img.width; canvas.height = img.height;
+        // 2x smooth upscale: the alpha edge of the 512px source becomes a rounder contour
+        const W = img.width * 2, H = img.height * 2;
+        canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(img, 0, 0);
-        const id = ctx.getImageData(0, 0, img.width, img.height); const d = id.data;
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, W, H);
+        const id = ctx.getImageData(0, 0, W, H); const d = id.data;
         // mean luminance of the solid pixels; soft-edge pixels often carry a pale matte colour, so pull them to the mean
         let sum = 0, n = 0;
         for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { sum += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; n++; }
@@ -202,7 +237,8 @@ export class Avatar {
     }
     if (slot === 'hair') {
       // opaque core; the soft strand tips are drawn by a second, blended pass (see _softHair)
-      return new THREE.MeshStandardMaterial({ map: this.texture(meta.map, { gray: true }), color: new THREE.Color(color || '#3a2a1f'), roughness: 0.78, envMapIntensity: 0.45, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide });
+      const strands = this.texture(meta.map, { gray: true });
+      return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: 1.6, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.62, envMapIntensity: 0.5, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide });
     }
     if (slot === 'brows' || slot === 'lashes') {
       return new THREE.MeshStandardMaterial({
@@ -225,7 +261,7 @@ export class Avatar {
 
   _softHair(core) {
     const m = core.clone();
-    m.alphaTest = 0.03; m.alphaToCoverage = false; m.transparent = true; m.depthWrite = false;
+    m.alphaTest = 0.36; m.alphaToCoverage = false; m.transparent = true; m.depthWrite = false;
     return m;
   }
 
@@ -243,6 +279,8 @@ export class Avatar {
     const s = this.state.parts; const w = { ...FIXED };
     for (const slot of ['hair', 'brows', 'lashes', 'shoes', 'hat', 'glasses', 'extra']) if (s[slot]) w[slot] = s[slot];
     if (s.full) w.full = s.full; else { if (s.top) w.top = s.top; if (s.bottom) w.bottom = s.bottom; }
+    // a saved avatar may name a part this build no longer ships: skip it instead of failing
+    for (const [slot, id] of Object.entries(w)) if (!this.D.proxies[id]) { delete w[slot]; if (s[slot] === id) s[slot] = null; }
     return w;
   }
 

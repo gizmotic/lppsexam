@@ -87,7 +87,7 @@ test('hair, clothes and shoes can be changed from the panel', async ({ page }) =
   await page.waitForFunction(() => __app.avatar.parts.get('hair')?.id === 'afro01');
   await page.locator('.rail button[data-id=clothes]').click();
   await page.locator('summary', { hasText: 'Kleider & Outfits' }).click();
-  await page.locator('.tile', { hasText: 'Kleid 2' }).click();
+  await page.locator('.tile', { hasText: 'Sommerkleid' }).click();
   await page.waitForFunction(() => __app.avatar.parts.get('full')?.id === 'f_dress_02' && !__app.avatar.parts.has('top'));
   await page.locator('summary', { hasText: 'Schuhe' }).click();
   await page.locator('.tile', { hasText: 'Barfuß' }).click();

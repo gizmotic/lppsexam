@@ -16,7 +16,7 @@ varying vec2 vUv;
 uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uAtlas, uPos;
 uniform float uHasPos, uWaist;
 uniform float uAgeMix, uFreckles, uBodyFreckles, uSeed, uLip, uBlush, uShadow, uBeard, uUnderTop, uUnderBottom;
-uniform vec3 uToneMul, uLipColor, uBlushColor, uShadowColor, uHairColor, uUnderColor;
+uniform vec3 uOldMul, uOldMulFace, uToneMul, uLipColor, uBlushColor, uShadowColor, uHairColor, uUnderColor;
 uniform vec4 uMoles[${MAX_MOLES}];
 uniform int uMoleCount;
 uniform vec4 uTat[${MAX_TATTOOS}];
@@ -42,7 +42,13 @@ vec3 toLinear(vec3 c){ return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4))
 
 void main(){
   vec4 mA = texture2D(uMaskA, vUv), mB = texture2D(uMaskB, vUv);
-  vec3 c = mix(texture2D(uSkinA, vUv).rgb, texture2D(uSkinB, vUv).rgb, uAgeMix);
+  // the older variant is colour-matched to the chosen skin, so the blend adds wrinkles without shifting the tone
+  float faceIsland = smoothstep(0.60, 0.66, vUv.x) * step(0.14, vUv.y) * step(vUv.y, 0.86);
+  // ageing transfers the older variant's light/dark structure (wrinkles, folds) onto the chosen skin, not its colour cast
+  vec3 c = texture2D(uSkinA, vUv).rgb;
+  vec3 older = texture2D(uSkinB, vUv).rgb * mix(uOldMul, uOldMulFace, faceIsland);
+  float relief = clamp(dot(older, vec3(0.3, 0.59, 0.11)) / max(dot(c, vec3(0.3, 0.59, 0.11)), 0.05), 0.5, 1.3);
+  c = mix(c, mix(c * relief, older, 0.25), uAgeMix);
   c *= uToneMul;
   // fine detail the 512px source cannot carry: pores and faint mottling
   float pores = vnoise(vUv * 1500.0) * 0.6 + vnoise(vUv * 3100.0) * 0.4;
@@ -134,7 +140,7 @@ export class SkinCompositor {
     this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
     this.quadScene = new THREE.Scene(); this.quadScene.add(this.quad);
-    this.skinTex = new Map(); this.avg = new Map();
+    this.skinTex = new Map(); this.avg = new Map(); this.avgFace = new Map();
     this._buildMasks();
     this._buildAtlas();
     const v4 = (n) => Array.from({ length: n }, () => new THREE.Vector4());
@@ -144,7 +150,7 @@ export class SkinCompositor {
         uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 }, uWaist: { value: 0.9 },
         uAgeMix: { value: 0 }, uFreckles: { value: 0 }, uBodyFreckles: { value: 0 }, uSeed: { value: 1 }, uLip: { value: 0 }, uBlush: { value: 0 },
         uShadow: { value: 0 }, uBeard: { value: 0 }, uUnderTop: { value: 0 }, uUnderBottom: { value: 1 },
-        uToneMul: { value: new THREE.Vector3(1, 1, 1) }, uLipColor: { value: new THREE.Color() }, uBlushColor: { value: new THREE.Color() },
+        uOldMul: { value: new THREE.Vector3(1, 1, 1) }, uOldMulFace: { value: new THREE.Vector3(1, 1, 1) }, uToneMul: { value: new THREE.Vector3(1, 1, 1) }, uLipColor: { value: new THREE.Color() }, uBlushColor: { value: new THREE.Color() },
         uShadowColor: { value: new THREE.Color() }, uHairColor: { value: new THREE.Color() }, uUnderColor: { value: new THREE.Color() },
         uMoles: { value: v4(MAX_MOLES) }, uMoleCount: { value: 0 }, uTat: { value: v4(MAX_TATTOOS) }, uTatInfo: { value: v4(MAX_TATTOOS) }, uTatCount: { value: 0 },
       },
@@ -246,9 +252,10 @@ export class SkinCompositor {
       t.image = img; t.needsUpdate = true; t.loaded = true;
       const cv = document.createElement('canvas'); cv.width = cv.height = 64;
       const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, 64, 64);
-      const d = ctx.getImageData(21, 16, 9, 12).data; let r = 0, g = 0, b = 0;
-      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-      const n = d.length / 4 * 255; this.avg.set(id, [r / n, g / n, b / n]);
+      const mean = (x, y, w, h) => { const d = ctx.getImageData(x, y, w, h).data; let r = 0, g = 0, b = 0;
+        for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; } const n = d.length / 4 * 255; return [r / n, g / n, b / n]; };
+      this.avg.set(id, mean(21, 16, 9, 12));            // chest
+      this.avgFace.set(id, mean(50, 22, 5, 5));         // cheek (the face island sits on the right, turned sideways)
       if (this._last) this.apply(...this._last); else this.dirty = true;
     };
     img.src = url(`tex/skin_${id}.webp`);
@@ -270,7 +277,10 @@ export class SkinCompositor {
     const u = this.material.uniforms;
     const a = this._skin(s.base), b = this._skin(this.oldVariant(s.base));
     u.uSkinA.value = a; u.uSkinB.value = b; u.uAgeMix.value = s.wrinkles;
-    const avg = this.avg.get(s.base);
+    const avg = this.avg.get(s.base), avgOld = this.avg.get(this.oldVariant(s.base));
+    if (avg && avgOld) u.uOldMul.value.set(avg[0] / avgOld[0], avg[1] / avgOld[1], avg[2] / avgOld[2]); else u.uOldMul.value.set(1, 1, 1);
+    const fa = this.avgFace.get(s.base), fo = this.avgFace.get(this.oldVariant(s.base));
+    if (fa && fo) u.uOldMulFace.value.set(fa[0] / fo[0], fa[1] / fo[1], fa[2] / fo[2]); else u.uOldMulFace.value.copy(u.uOldMul.value);
     if (s.tone && avg) { const t = new THREE.Color(s.tone).convertLinearToSRGB(); u.uToneMul.value.set(t.r / avg[0], t.g / avg[1], t.b / avg[2]); }
     else u.uToneMul.value.set(1, 1, 1);
     // THREE.Color parses hex as sRGB -> linear; the compositor works on raw sRGB values
