@@ -26,6 +26,7 @@ export async function exportGLB(app, opts = {}) {
   const baked = new THREE.CanvasTexture(skin.toCanvas(opts.textureSize || 1024));
   baked.colorSpace = THREE.SRGBColorSpace;
   avatar.skinMaterial.map = baked;
+  const hidden = []; avatar.root.traverse((o) => { if (o.userData.noExport && o.visible) { o.visible = false; hidden.push(o); } });
   avatar.root.updateMatrixWorld(true);
   try {
     const clips = withAnim ? Object.values(buildClips(avatar)).filter((c) => c.name !== 'pose') : [];
@@ -33,7 +34,7 @@ export async function exportGLB(app, opts = {}) {
     if (opts.save !== false) download(new Blob([glb], { type: 'model/gltf-binary' }), 'avatar.glb');
     return glb;
   } finally {
-    avatar.skinMaterial.map = liveMap; baked.dispose();
+    avatar.skinMaterial.map = liveMap; baked.dispose(); hidden.forEach((o) => { o.visible = true; });
     const cur = animator.current; animator.action = null; animator.current = null;
     animator.play(cur || 'idle', 0);
   }

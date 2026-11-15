@@ -50,9 +50,9 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 .sec-body { padding: 0 14px 12px; }
 
 .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-.tile { border: 2px solid transparent; background: var(--paper2); border-radius: 10px; padding: 0; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; aspect-ratio: 1 / 1.18; }
+.tile { border: 2px solid transparent; background: var(--paper2); border-radius: 10px; padding: 0; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; aspect-ratio: 1 / 1.42; }
 .tile img, .tile .ph { flex: 1; min-height: 0; width: 100%; object-fit: cover; display: grid; place-items: center; font-size: 24px; color: var(--ink2); background-color: #ece6de; background-repeat: no-repeat; }
-.tile .cap { font-size: 10px; line-height: 1.15; padding: 3px 2px 4px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .cap { font-size: 10px; line-height: 1.15; padding: 3px 2px 4px; color: var(--ink2); min-height: 2.3em; display: grid; place-items: center; overflow: hidden; hyphens: auto; }
 .tile .cap:empty { display: none; }
 .tile:hover { border-color: #cfc6ba; }
 .tile.on { border-color: var(--accent); background: var(--accent-soft); }

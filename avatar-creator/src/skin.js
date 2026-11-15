@@ -14,7 +14,7 @@ const FRAG = /* glsl */`
 precision highp float;
 varying vec2 vUv;
 uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uAtlas, uPos;
-uniform float uHasPos;
+uniform float uHasPos, uWaist;
 uniform float uAgeMix, uFreckles, uBodyFreckles, uSeed, uLip, uBlush, uShadow, uBeard, uUnderTop, uUnderBottom;
 uniform vec3 uToneMul, uLipColor, uBlushColor, uShadowColor, uHairColor, uUnderColor;
 uniform vec4 uMoles[${MAX_MOLES}];
@@ -50,7 +50,7 @@ void main(){
   c.gb *= 1.0 - (vnoise(vUv * 55.0) - 0.5) * 0.035;
 
   // blush
-  c *= mix(vec3(1.0), uBlushColor / max(lum(uBlushColor), 0.2) * 0.92, clamp(mA.g * uBlush * 0.8, 0.0, 1.0));
+  c *= mix(vec3(1.0), mix(vec3(1.0), uBlushColor / max(lum(uBlushColor), 0.2) * 0.94, 0.55), clamp(mA.g * uBlush * 0.7, 0.0, 1.0));
   // eye shadow
   float lid = smoothstep(0.12, 0.55, mA.b) * uShadow;
   c = mix(c, uShadowColor * (0.55 + 0.6 * lum(c)), lid * 0.85);
@@ -67,7 +67,7 @@ void main(){
   // beard shadow + stubble
   float bm = smoothstep(0.15, 0.6, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
   float stub = max(spots(vUv, 3400.0, 0.9, 3.0), spots(vUv, 2300.0, 0.7, 9.0));
-  c = mix(c, uHairColor * 0.5 + c * 0.3, bm * (0.36 + 0.5 * stub));
+  c = mix(c, c * (uHairColor * 0.75 + 0.2), bm * (0.3 + 0.6 * stub));
 
   // moles
   for (int i = 0; i < ${MAX_MOLES}; i++) {
@@ -95,9 +95,9 @@ void main(){
   if (uHasPos > 0.5) {
     // crisp edges from the rest-pose position of each texel (decimetres, origin at mid body)
     vec4 bp = texture2D(uPos, vUv); float e = 0.012, ax = abs(bp.x);
-    float inB = smoothstep(-0.96 - e, -0.96 + e, bp.y) * (1.0 - smoothstep(0.9 - e, 0.9 + e, bp.y)) * step(ax, 2.6);
+    float inB = smoothstep(-0.96 - e, -0.96 + e, bp.y) * (1.0 - smoothstep(uWaist - e, uWaist + e, bp.y)) * step(ax, 2.6);
     float inT = smoothstep(3.36 - e, 3.36 + e, bp.y) * (1.0 - smoothstep(4.74 - e, 4.74 + e, bp.y)) * (1.0 - smoothstep(1.56 - e, 1.56 + e, ax));
-    float bandB = 1.0 - smoothstep(0.0, 0.11, min(bp.y + 0.96, 0.9 - bp.y));
+    float bandB = 1.0 - smoothstep(0.0, 0.11, min(bp.y + 0.96, uWaist - bp.y));
     float bandT = 1.0 - smoothstep(0.0, 0.09, min(min(bp.y - 3.36, 4.74 - bp.y), 1.56 - ax));
     mb = inB * bp.a; mt = inT * bp.a; hem = max(mb * bandB, mt * bandT);
   }
@@ -141,7 +141,7 @@ export class SkinCompositor {
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
       uniforms: {
-        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 },
+        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 }, uWaist: { value: 0.9 },
         uAgeMix: { value: 0 }, uFreckles: { value: 0 }, uBodyFreckles: { value: 0 }, uSeed: { value: 1 }, uLip: { value: 0 }, uBlush: { value: 0 },
         uShadow: { value: 0 }, uBeard: { value: 0 }, uUnderTop: { value: 0 }, uUnderBottom: { value: 1 },
         uToneMul: { value: new THREE.Vector3(1, 1, 1) }, uLipColor: { value: new THREE.Color() }, uBlushColor: { value: new THREE.Color() },
@@ -174,7 +174,7 @@ export class SkinCompositor {
       const front = ss(0.75, 1.15, z);
       // blush: cheek apples
       const dc = Math.hypot(ax - 0.55, y - 6.93, (z - 1.2) * 0.6);
-      A[4 * v + 1] = y > 6 ? Math.exp(-(dc * dc) / (0.26 * 0.26)) : 0;
+      A[4 * v + 1] = y > 6 ? Math.exp(-(dc * dc) / (0.34 * 0.34)) : 0;
       // face freckles: nose bridge and cheeks
       A[4 * v + 3] = y > 6.2 ? front * Math.exp(-(((y - 7.02) / 0.3) ** 2)) * Math.exp(-((x / 0.8) ** 2)) : 0;
       // underwear
@@ -280,6 +280,7 @@ export class SkinCompositor {
     u.uFreckles.value = s.freckles; u.uBodyFreckles.value = s.bodyFreckles; u.uSeed.value = s.freckleSeed;
     u.uLip.value = s.lipStrength; u.uBlush.value = s.blush; u.uShadow.value = s.shadow; u.uBeard.value = s.beard;
     u.uUnderBottom.value = CONFIG.underwear ? 1 : 0;
+    u.uWaist.value = ctx.hipsCovered ? 0.45 : 0.9;   // stays below a low waistband
     // auto: only when nothing covers the chest, so it never peeks out of a neckline
     u.uUnderTop.value = CONFIG.underwear && (s.underTop === 'on' || (s.underTop === 'auto' && ctx.gender < 0.5 && !ctx.chestCovered)) ? 1 : 0;
     const moles = CONFIG.moles ? s.moles.slice(0, MAX_MOLES) : [];

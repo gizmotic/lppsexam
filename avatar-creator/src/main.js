@@ -69,7 +69,7 @@ const app = {
   panelWidth: 0, placing: null, listeners: new Set(),
   // ---- change notifications from the UI
   shapeChanged() { avatar.dirty.shape = true; app.save(); },
-  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top) }); app.save(); },
+  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top), hipsCovered: !!(state.parts.full || state.parts.bottom) }); app.save(); },
   colorsChanged() { avatar.applyColors(); app.skinChanged(); },
   async partsChanged() { await avatar.syncParts(); avatar.update(); animator.rebuild(); app.skinChanged(); },
   setAnim(id) { state.anim = id; animator.play(id); app.save(); },

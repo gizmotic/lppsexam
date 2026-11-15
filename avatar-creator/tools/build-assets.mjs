@@ -12,7 +12,8 @@ const MH = process.env.MH_DATA;
 const NP = process.env.MH_MIRROR;
 if (!MH || !NP) throw new Error('set MH_DATA and MH_MIRROR');
 const OUT = path.resolve(import.meta.dirname, '../public/assets');
-for (const d of ['proxies', 'tex', 'thumbs']) { fs.rmSync(path.join(OUT, d), { recursive: true, force: true }); fs.mkdirSync(path.join(OUT, d), { recursive: true }); }
+for (const d of ['proxies', 'tex']) { fs.rmSync(path.join(OUT, d), { recursive: true, force: true }); fs.mkdirSync(path.join(OUT, d), { recursive: true }); }
+fs.mkdirSync(path.join(OUT, 'thumbs'), { recursive: true });   // rendered by tools/make-thumbs.mjs, kept between builds
 
 // ---------------------------------------------------------------- helpers
 class Bin {
@@ -98,7 +99,7 @@ async function tex(src, dst, opts = {}) {
   if (opts.clearLens) {
     // the lens area is authored half-opaque and dark (sunglasses): make it a faint clear tint
     const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 60 && data[i + 3] < 215) { data[i + 3] = 34; data[i] = 190; data[i + 1] = 205; data[i + 2] = 215; }
+    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 60 && data[i + 3] < 215) { data[i + 3] = 12; data[i] = 150; data[i + 1] = 170; data[i + 2] = 185; }
     img = sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } });
   }
   if (opts.size) img = img.resize(opts.size, opts.size, { fit: 'inside' });
@@ -243,7 +244,7 @@ const CATALOG = [
   ['hair', 'short01', 'hair', 'Kurz 1', MHC], ['hair', 'short02', 'hair', 'Kurz 2', MHC], ['hair', 'short03', 'hair', 'Kurz 3', MHC],
   ['hair', 'short04', 'hair', 'Kurz 4', MHC], ['hair', 'bob01', 'hair', 'Bob 1', MHC], ['hair', 'bob02', 'hair', 'Bob 2', MHC],
   ['hair', 'long01', 'hair', 'Lang', MHC], ['hair', 'ponytail01', 'hair', 'Pferdeschwanz', MHC], ['hair', 'Braid01', 'hair', 'Zopf', MHC],
-  ['hair', 'afro01', 'hair', 'Afro', MHC],
+  ['hair', 'afro01', 'hair', 'Kurze Locken', MHC],
   ...Array.from({ length: 12 }, (_, i) => ['eyebrows', 'eyebrow' + String(i + 1).padStart(3, '0'), 'brows', 'Braue ' + (i + 1), MHC]),
   ['eyelashes', 'Eyelashes01', 'lashes', 'Wimpern 1', MHC], ['eyelashes', 'eyelashes02', 'lashes', 'Wimpern 2', MHC],
   ['eyelashes', 'eyelashes03', 'lashes', 'Wimpern 3', MHC], ['eyelashes', 'eyelashes04', 'lashes', 'Wimpern 4', MHC],
@@ -296,7 +297,6 @@ for (const [cat, name, slot, label, credit] of CATALOG) {
   const id0 = name.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase();
   const texDiff = mat.mapDiffuse ? await tex(path.join(dir, mat.mapDiffuse), `tex/${id0}_d.webp`, { q: 90, logo: LOGO_BOXES[name], clearLens: name === 'glasses' }) : null;
   const texNorm = mat.mapNormal ? await tex(path.join(dir, mat.mapNormal), `tex/${id0}_n.webp`, { q: 86 }) : null;
-  const thumb = await tex(path.join(dir, name + '.thumb.png'), `thumbs/${id0}.webp`, { size: 128, q: 80 });
   credits.add(credit);
 
   // parts
@@ -335,10 +335,10 @@ for (const [cat, name, slot, label, credit] of CATALOG) {
     // a split part only hides the body verts inside its own height band
     const pdel = part.sel ? del.filter((v) => base.v[3 * v + 1] >= lo - 0.15 && base.v[3 * v + 1] <= hi + 0.15) : del;
     const meta = await writeProxy(id, { ref, bary, off, faces: pf, uvSrc: j.uvs[0], del: pdel });
-    proxies[id] = {
-      ...meta, slot: part.slot, label: label + (part.suffix === '_top' ? ' · Oberteil' : part.suffix === '_bottom' ? ' · Hose' : ''),
-      map: texDiff, normal: texNorm, thumb, credit, tags: m.tags || [],
-    };
+    // own rendered thumbnail if present, else the bundled preview
+    const thumb = `thumbs/${id}.webp`;
+    if (!fs.existsSync(path.join(OUT, thumb))) await tex(path.join(dir, name + '.thumb.png'), thumb, { size: 128, q: 80 });
+    proxies[id] = { ...meta, slot: part.slot, label, map: texDiff, normal: texNorm, thumb, credit, tags: m.tags || [] };
   }
 }
 

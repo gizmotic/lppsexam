@@ -153,7 +153,8 @@ export class Avatar {
         for (let i = 0; i < d.length; i += 4) {
           const a = d[i + 3] / 255; let l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
           l = l * a + mean * (1 - a);
-          l = Math.min(255, 255 * Math.pow(l / 255, gamma) * gain);
+          l = 255 * Math.pow(l / 255, gamma) * gain;
+          l = Math.max(0, Math.min(255, 160 + (l - 160) * 1.45));   // more strand contrast
           d[i] = d[i + 1] = d[i + 2] = l;
         }
         ctx.putImageData(id, 0, 0); t.image = canvas; t.needsUpdate = true;
@@ -200,7 +201,8 @@ export class Avatar {
       return new THREE.MeshPhysicalMaterial({ map: this.eyeTexture(this.state.eyes.color), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, transparent: true, alphaTest: 0.02, envMapIntensity: 0.55 });
     }
     if (slot === 'hair') {
-      return new THREE.MeshStandardMaterial({ map: this.texture(meta.map, { gray: true }), color: new THREE.Color(color || '#3a2a1f'), roughness: 0.78, envMapIntensity: 0.45, alphaTest: 0.14, alphaToCoverage: true, side: THREE.DoubleSide });
+      // opaque core; the soft strand tips are drawn by a second, blended pass (see _softHair)
+      return new THREE.MeshStandardMaterial({ map: this.texture(meta.map, { gray: true }), color: new THREE.Color(color || '#3a2a1f'), roughness: 0.78, envMapIntensity: 0.45, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide });
     }
     if (slot === 'brows' || slot === 'lashes') {
       return new THREE.MeshStandardMaterial({
@@ -221,11 +223,18 @@ export class Avatar {
     return m;
   }
 
+  _softHair(core) {
+    const m = core.clone();
+    m.alphaTest = 0.03; m.alphaToCoverage = false; m.transparent = true; m.depthWrite = false;
+    return m;
+  }
+
   applyColors() {
     for (const [slot, p] of this.parts) {
       const old = p.mesh.material;
       p.mesh.material = this._material(slot, p.proxy.meta);
       old.dispose();
+      if (p.soft) { p.soft.material.dispose(); p.soft.material = this._softHair(p.mesh.material); }
     }
   }
 
@@ -243,7 +252,11 @@ export class Avatar {
     const loaded = await Promise.all(Object.entries(want).map(async ([slot, id]) => [slot, id, await this.D.proxy(id)]));
     if (version !== this._partsVersion) return;
     for (const [slot, p] of [...this.parts]) {
-      if (want[slot] !== p.id) { this.root.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); this.parts.delete(slot); }
+      if (want[slot] !== p.id) {
+        this.root.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose();
+        if (p.soft) { this.root.remove(p.soft); p.soft.material.dispose(); }
+        this.parts.delete(slot);
+      }
     }
     for (const [slot, id, proxy] of loaded) {
       if (this.parts.has(slot)) continue;
@@ -274,7 +287,13 @@ export class Avatar {
       if (slot === 'glasses') mesh.renderOrder = 3;
       if (mesh.morphTargetInfluences && this.body.morphTargetInfluences) this.body.morphTargetInfluences.forEach((v, i) => { mesh.morphTargetInfluences[i] = v; });
       this.root.add(mesh);
-      this.parts.set(slot, { id, mesh, proxy, P: new Float32Array(proxy.nP * 3) });
+      const part = { id, mesh, proxy, P: new Float32Array(proxy.nP * 3) };
+      if (slot === 'hair') {
+        part.soft = this._skinned(g, this._softHair(mesh.material), 'Part_hair_soft');
+        part.soft.castShadow = false; part.soft.receiveShadow = false; part.soft.renderOrder = 1; part.soft.userData.noExport = true;
+        this.root.add(part.soft);
+      }
+      this.parts.set(slot, part);
     }
     this._updateBodyMask();
     this.dirty.shape = true;
@@ -368,6 +387,28 @@ export class Avatar {
         }
       }
       gp.needsUpdate = true; gn.needsUpdate = true;
+    }
+    // garment-on-garment: a hat hides the hair inside its crown, a long coat or tunic hides what it covers of the trousers/skirt
+    const lowest = (part) => { const a = part.mesh.geometry.attributes.position.array; let m = Infinity; for (let i = 1; i < a.length; i += 3) if (a[i] < m) m = a[i]; return m; };
+    const cullAbove = (part, cut) => {
+      const src = part.proxy.idx; let idx = src;
+      if (cut !== null) {
+        const A = part.mesh.geometry.attributes.position.array, out = new Uint32Array(src.length); let n = 0;
+        for (let i = 0; i < src.length; i += 3) {
+          if (A[3 * src[i] + 1] > cut && A[3 * src[i + 1] + 1] > cut && A[3 * src[i + 2] + 1] > cut) continue;
+          out[n++] = src[i]; out[n++] = src[i + 1]; out[n++] = src[i + 2];
+        }
+        idx = out.subarray(0, n);
+      }
+      if (part.culled || cut !== null) part.mesh.geometry.setIndex(new THREE.BufferAttribute(idx, 1));
+      part.culled = cut !== null;
+    };
+    const hair = this.parts.get('hair'), hat = this.parts.get('hat'), top = this.parts.get('top'), bottom = this.parts.get('bottom');
+    if (hair) cullAbove(hair, hat ? lowest(hat) + 0.012 : null);
+    if (bottom) {
+      const hip = rest[3 * D.bones.findIndex((b) => b.name === 'upperleg01.L') + 1];
+      const hem = top ? lowest(top) : Infinity;
+      cullAbove(bottom, hem < hip - 0.1 ? hem + 0.04 : null);
     }
     this.root.position.y = -minY;
     this.height = maxY - minY;

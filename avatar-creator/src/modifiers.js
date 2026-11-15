@@ -174,6 +174,11 @@ export function targetWeights(state) {
     for (const hk of ['minheight', 'maxheight']) add(`macrodetails/height/${gk}-${ak}-averagemuscle-averageweight-${hk}`, ga * he[hk]);
     for (const pk of ['uncommonproportions', 'idealproportions']) add(`macrodetails/proportions/${gk}-${ak}-averagemuscle-averageweight-${pk}`, ga * pr[pk]);
   }
+  // above average, "Muskelmasse" also sharpens definition (the macro alone mostly adds bulk)
+  const def = Math.max(0, 2 * m.muscle - 1) * 0.85;
+  if (def > 0) for (const t of ['stomach/stomach-tone', 'torso/torso-muscle-pectoral', 'torso/torso-muscle-dorsi', 'armslegs/l-upperarm-muscle', 'armslegs/r-upperarm-muscle',
+    'armslegs/l-upperarm-shoulder-muscle', 'armslegs/r-upperarm-shoulder-muscle', 'armslegs/l-lowerarm-muscle', 'armslegs/r-lowerarm-muscle',
+    'armslegs/l-upperleg-muscle', 'armslegs/r-upperleg-muscle', 'armslegs/l-lowerleg-muscle', 'armslegs/r-lowerleg-muscle']) add(t + '-incr', def);
   for (const [key, v] of Object.entries(state.mods)) {
     if (!v) continue;
     const [t, lo, hi] = key.split('|');

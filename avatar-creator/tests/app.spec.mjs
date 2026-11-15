@@ -83,7 +83,7 @@ test('face slider moves the nose through the panel UI', async ({ page }) => {
 test('hair, clothes and shoes can be changed from the panel', async ({ page }) => {
   await ready(page);
   await page.locator('.rail button[data-id=hair]').click();
-  await page.locator('.tile', { hasText: 'Afro' }).click();
+  await page.locator('.tile', { hasText: 'Kurze Locken' }).click();
   await page.waitForFunction(() => __app.avatar.parts.get('hair')?.id === 'afro01');
   await page.locator('.rail button[data-id=clothes]').click();
   await page.locator('summary', { hasText: 'Kleider & Outfits' }).click();
