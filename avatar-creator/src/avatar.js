@@ -488,7 +488,7 @@ export class Avatar {
       part.culled = cut !== null;
     };
     const hair = this.parts.get('hair'), hat = this.parts.get('hat'), top = this.parts.get('top'), bottom = this.parts.get('bottom');
-    if (hair) cullAbove(hair, hat && !hat.proxy.meta.noCull ? lowest(hat) + 0.012 : null);
+    if (hair) cullAbove(hair, hat && !hat.proxy.meta.noCull ? lowest(hat) - 0.06 : null);   // the cap is thicker than the hair: what it covers is dropped, no pale gap at its edge
     if (bottom) {
       // the top's hem at the middle of the torso (sleeves excluded): whatever the trousers/skirt have above it lies under the top
       // and would poke through it, so it is dropped. A crop top's hem is higher than the waistband, so nothing is dropped then.

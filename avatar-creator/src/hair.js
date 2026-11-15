@@ -188,14 +188,14 @@ export const HAIR_STYLES = {
     pieces: (m) => { m.tail({ phi: 118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: 1, front: true }); m.tail({ phi: -118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: -1, front: true }); } },
   // ---- head wear (slot 'hat'): solid shell on the skull, cut along a cap line, plus a brim piece
   gen_cap: { slot: 'hat', label: 'Baseball-Kappe', defaultColor: '#2d6fb0', ignoreHairline: true, vol: 1, region: (h) => (h.th - CAPEDGE(h.aphi)) * 0.03,
-    thick: (h) => 0.16 + 0.07 * ss(10, 70, h.th), pieces: (m) => m.brim({ phi: 0, span: 62, len: 0.82, droop: 0.2 }) },
+    thick: (h) => 0.27 + 0.08 * ss(10, 70, h.th), pieces: (m) => m.brim({ phi: 0, span: 62, len: 0.85, droop: 0.2 }) },
   gen_cap_back: { slot: 'hat', label: 'Kappe verkehrt herum', defaultColor: '#c0392b', ignoreHairline: true, vol: 1, region: (h) => (h.th - CAPEDGE(h.aphi)) * 0.03,
-    thick: (h) => 0.16 + 0.07 * ss(10, 70, h.th), pieces: (m) => m.brim({ phi: 180, span: 62, len: 0.82, droop: 0.2 }) },
+    thick: (h) => 0.27 + 0.08 * ss(10, 70, h.th), pieces: (m) => m.brim({ phi: 180, span: 62, len: 0.85, droop: 0.2 }) },
   gen_snapback: { slot: 'hat', label: 'Snapback (flacher Schirm)', defaultColor: '#1d1d20', ignoreHairline: true, vol: 1, region: (h) => (h.th - CAPEDGE(h.aphi)) * 0.03,
-    thick: (h) => 0.17 + 0.1 * ss(25, 62, h.th), pieces: (m) => m.brim({ phi: 0, span: 66, len: 0.95, droop: 0.04 }) },
+    thick: (h) => 0.28 + 0.1 * ss(25, 62, h.th), pieces: (m) => m.brim({ phi: 0, span: 66, len: 0.95, droop: 0.04 }) },
   gen_beanie: { slot: 'hat', label: 'Mütze', defaultColor: '#6b7280', ignoreHairline: true, vol: 1,
     region: (h) => (h.th - (h.aphi < 60 ? lerp(-4, -22, ss(0, 60, h.aphi)) : -30 - 6 * ss(60, 180, h.aphi))) * 0.03,
-    thick: (h) => 0.2 + 0.08 * ss(15, 75, h.th) + 0.07 * ss(0.5, 0, (h.th - (h.aphi < 60 ? -10 : -32)) * 0.03), bumps: [0.012, 22] },
+    thick: (h) => 0.28 + 0.08 * ss(15, 75, h.th) + 0.07 * ss(0.5, 0, (h.th - (h.aphi < 60 ? -10 : -32)) * 0.03), bumps: [0.012, 22] },
   gen_headband: { slot: 'hat', label: 'Stirnband', defaultColor: '#e9e6e1', ignoreHairline: true, vol: 1, noCull: true,
     region: (h) => 0.32 - Math.abs(h.th - 15) * 0.04, thick: () => 0.1 },
 
@@ -379,7 +379,7 @@ export function buildHair(D, id) {
         const c = Math.abs(k / N - 0.5) * 2, a = phi + (k / N - 0.5) * 2 * span, ap = Math.abs(((a + 540) % 360) - 180) >= 0 ? Math.abs((((a % 360) + 540) % 360) - 180) : 0;
         const aphi = Math.abs((((a % 360) + 540) % 360) - 180), i = nearest(a, CAPEDGE(aphi)), ar = (a * Math.PI) / 180;
         const L = len * (1 - 0.78 * Math.pow(c, 2.2)), dx = Math.sin(ar), dz = Math.cos(ar), row = [];
-        for (let r = 0; r <= rows; r++) { const u = r / rows; row.push(add(i, out[3 * i] + dx * L * u, out[3 * i + 1] - droop * u * u + 0.04 * Math.sin(u * Math.PI), out[3 * i + 2] + dz * L * u, k / N * 2, u, 1)); }
+        for (let r = 0; r <= rows; r++) { const u = r / rows; row.push(add(i, out[3 * i] + dx * L * u, out[3 * i + 1] - droop * (1 + 1.6 * c * c) * u * u + 0.04 * Math.sin(u * Math.PI) * (1 - c), out[3 * i + 2] + dz * L * u, k / N * 2, u, 1)); }
         grid.push(row);
       }
       for (let k = 0; k < N; k++) for (let r = 0; r < rows; r++) { const a = grid[k][r], b = grid[k + 1][r], c = grid[k][r + 1], d = grid[k + 1][r + 1]; I.push(a, c, b, b, c, d); }
