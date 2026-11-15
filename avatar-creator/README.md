@@ -26,9 +26,9 @@ Baut die Produktionsversion und lässt die 9 End-to-End-Tests dagegen laufen.
 | Körper | Geschlecht, Alter, Größe, Gewicht, Muskelmasse, Proportionen, Körperbau-Typ; Oberkörper, Brust (Größe, Festigkeit, Form), Bauch & Hüfte, Arme & Hände, Beine & Füße |
 | Gesicht | Kopfform, Stirn, Augen (+ freie Augenfarbe, Wimpern), Augenbrauen (12 Formen, Farbe), Nase, Mund, Wangen, Kinn & Kiefer, Ohren, Hals – 139 Regler |
 | Haut | 20 Hauttypen, Hautton, Falten, Sommersprossen (Gesicht/Körper), Punkterl per Klick, Lippen, Rouge, Lidschatten, Bartschatten, eigene Kopftextur (Abwicklung) |
-| Haare | 27 erzeugte Frisuren (Fade, Tolle, Curtains, Locken, Afro, Cornrows, Dreads, Dutt, Zöpfe …) + Glatze, freie Haarfarbe |
+| Haare | 38 erzeugte Frisuren inkl. aller aus den Kundenvorlagen (Buzz, Caesar, Nach hinten, Tolle, Strukturiert, Schulterlang, Wellig, Dreads, Männer-Dutt; Bob, Langer Bob, Langes welliges, Zotteliges, Kurzes lockiges, Pixie, Pferdeschwanz, Zöpfe, Unordentlicher Dutt …) + Glatze, freie Haarfarbe, Filter Männlich/Weiblich |
 | Kleidung | 18 Oberteile, 10 Hosen/Röcke, 10 Kleider/Outfits, 7 Paar Schuhe, jeweils umfärbbar; Oberteil und Hose/Rock sind Pflicht (Schulbetrieb) |
-| Deko | 3 Hüte, Brille, Armstulpen, Tattoos per Klick (16 Motive) |
+| Deko | Hüte & Kappen (Baseball-Kappe, verkehrt herum, Snapback, Mütze, Stirnband + 3 Hüte), Brille, Armstulpen, Tattoos per Klick (16 Motive) |
 | Bewegung | Stehen, Winken, Gehen, Tanzen, A-Pose – mit Blinzeln und Lächeln |
 | Export | GLB (163 Knochen, Skinning, 6 Mimik-Morphs, 4 Animationen, Texturen), PNG-Foto, Avatar als JSON speichern/laden |
 

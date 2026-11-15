@@ -58,3 +58,14 @@
     (u = Azimut, v = Höhe, gemessen auf dem unveränderten Kopf – Augenabstand und Ohrenlage passen ohne Anpassung). Haare, Brauen,
     Augäpfel und der schwarze Hintergrund werden mit Wangenfarbe und örtlicher Helligkeit übermalt. Körperhaut zieht die Farbe nach.
     Das Bild bleibt im Speicher (nicht hochgeladen, nicht gespeichert, nicht im JSON).
+
+## Frisuren-Runden und Kopfbedeckungen
+
+29. **Haaransatz gesenkt** (Stirn 10° statt 27°), **Volumen** über einen Faktor je Stil (`vol`, Standard 1,55), Haarwurzeln per Vertex-Farbe
+    abgedunkelt (die dünne Vorderkante wirkte sonst als heller Streifen).
+30. **Lange Haare fallen seitlich nach vorn über die Schultern**, Haare vom Hinterkopf hinter den Körper – wie in den Kundenvorlagen.
+    Vorher verschwand alles hinter den Schultern und die langen Frisuren sahen am Kinn abgeschnitten aus.
+31. **Kopfbedeckungen als erzeugte Teile** (`slot: 'hat'`): Kappe, verkehrt herum, Snapback, Mütze, Stirnband. Kappenlinie nach Azimut (vorn hoch, im
+    Nacken tief), Schirm als gebogener Streifen. Haare unter der Kappe werden entlang dieser Linie ausgeblendet, nicht nach fester Höhe.
+32. **Nichts von zonk.me übernommen:** die Seite ist von hier nicht erreichbar, und ihre Modelle sind urheberrechtlich geschützt. Die Kappen und
+    Frisuren sind eigene Modelle in den üblichen Formen.

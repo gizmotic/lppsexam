@@ -44,3 +44,8 @@ siehe unten. Offen ist Qualität an Haaren und Nahaufnahme, kein fehlendes Kerns
 
 ## Wiederaufnahme
 `npm install && npm run dev`, dann `node tools/sheet.mjs <shots.json> <out.png>` für Kontrollbögen.
+
+## Frisuren (Stand nach Kundenrückmeldung)
+- Kritiker-Runde 1 (Frisuren gegen die Kundenvorlagen): **nein** – Haaransatz zu hoch, Stile kaum unterscheidbar, glatte Hülle.
+- Danach: Haaransatz gesenkt, Volumen, unterscheidbare Silhouetten, lange Haare über den Schultern, Kopfbedeckungen. Eine zweite Runde steht aus.
+- Nicht übernommen: Frisuren/Kappe von zonk.me (nicht erreichbar, Urheberrecht).
