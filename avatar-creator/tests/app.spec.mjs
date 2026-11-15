@@ -156,3 +156,33 @@ test('state survives a reload and the download stays under budget', async ({ pag
   const du = (d) => fs.readdirSync(d, { withFileTypes: true }).reduce((s, e) => s + (e.isDirectory() ? du(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size), 0);
   expect(du('dist')).toBeLessThan(40e6);
 });
+
+test('school-safe: the base layer covers torso and hips on every figure, and clothes cannot be removed', async ({ page }) => {
+  await ready(page);
+  // even when the state asks for no clothes at all, a top and a bottom are worn
+  await page.evaluate(async () => { const s = __app.state; s.parts.top = null; s.parts.bottom = null; s.parts.full = null; await __app.partsChanged(); });
+  expect(await page.evaluate(() => [__app.avatar.parts.has('top'), __app.avatar.parts.has('bottom')])).toEqual([true, true]);
+  await page.locator('.rail button[data-id=clothes]').click();
+  await page.locator('summary', { hasText: 'Oberteile' }).click();
+  await expect(page.locator('details[open] .tile.none')).toHaveCount(0);
+  // the painted layer: every skin texel on chest, belly, hips and upper thighs has the base-layer colour, for both sexes
+  for (const gender of [0, 1]) {
+    const res = await page.evaluate(async (gender) => {
+      const { D, skin, state } = __app;
+      state.macro.gender = gender; state.skin.underColor = '#2d6fb0'; __app.shapeChanged(); __app.skinChanged();
+      await new Promise((r) => setTimeout(r, 300)); skin.render();
+      const S = 1024, px = skin.toCanvas(S).getContext('2d').getImageData(0, 0, S, S).data;
+      let n = 0, bad = 0;
+      for (let r = 0; r < D.body.nR; r++) {
+        const v = D.body.vmap[r] * 3, x = Math.abs(D.pos[v]), y = D.pos[v + 1];
+        const torso = y > 1.1 && y < 5.0 && x < 1.3, hips = y > -1.2 && y < 1.1 && x < 2.2;
+        if (!torso && !hips) continue;
+        const u = Math.min(S - 1, Math.round(D.body.uv[2 * r] * S)), w = Math.min(S - 1, Math.round((1 - D.body.uv[2 * r + 1]) * S)), i = 4 * (w * S + u);
+        n++; if (!(px[i + 2] > px[i] + 40)) bad++;      // blue layer: blue well above red; skin is the other way round
+      }
+      return { n, bad };
+    }, gender);
+    expect(res.n).toBeGreaterThan(1000);
+    expect(res.bad / res.n).toBeLessThan(0.01);          // only texels right on a UV seam may differ
+  }
+});

@@ -280,12 +280,17 @@ export class Avatar {
     return m;
   }
 
-  applyColors() {
-    for (const [slot, p] of this.parts) {
-      const old = p.mesh.material;
-      p.mesh.material = this._material(slot, p.proxy.meta);
-      old.dispose();
-      if (p.soft) { p.soft.material.dispose(); p.soft.material = this._softHair(p.mesh.material); }
+  // New materials are built first and swapped in only once their textures are in memory:
+  // a garment whose texture is still loading would render invisible for a moment.
+  async applyColors() {
+    const version = this._colorVersion = (this._colorVersion || 0) + 1;
+    const next = [...this.parts].map(([slot, p]) => [p, this._material(slot, p.proxy.meta)]);
+    await this.texturesReady();
+    if (version !== this._colorVersion) { next.forEach(([, m]) => m.dispose()); return; }
+    for (const [p, m] of next) {
+      if (!this.root.children.includes(p.mesh)) { m.dispose(); continue; }
+      p.mesh.material.dispose(); p.mesh.material = m;
+      if (p.soft) { p.soft.material.dispose(); p.soft.material = this._softHair(m); }
     }
   }
 
@@ -293,7 +298,13 @@ export class Avatar {
   wanted() {
     const s = this.state.parts; const w = { ...FIXED };
     for (const slot of ['hair', 'brows', 'lashes', 'shoes', 'hat', 'glasses', 'extra']) if (s[slot]) w[slot] = s[slot];
-    if (s.full) w.full = s.full; else { if (s.top) w.top = s.top; if (s.bottom) w.bottom = s.bottom; }
+    if (s.full && this.D.proxies[s.full]) w.full = s.full;
+    else {
+      // school-safe: a figure without an outfit always gets a top and a bottom, whatever the saved state says
+      const top = this.D.proxies[s.top] ? s.top : CONFIG.schoolSafe ? CONFIG.defaultTop : null;
+      const bottom = this.D.proxies[s.bottom] ? s.bottom : CONFIG.schoolSafe ? CONFIG.defaultBottom : null;
+      if (top) w.top = s.top = top; if (bottom) w.bottom = s.bottom = bottom;
+    }
     // a saved avatar may name a part this build no longer ships: skip it instead of failing
     for (const [slot, id] of Object.entries(w)) if (!this.D.proxies[id]) { delete w[slot]; if (s[slot] === id) s[slot] = null; }
     return w;
@@ -304,15 +315,10 @@ export class Avatar {
     const want = this.wanted();
     const loaded = await Promise.all(Object.entries(want).map(async ([slot, id]) => [slot, id, await this.D.proxy(id)]));
     if (version !== this._partsVersion) return;
-    for (const [slot, p] of [...this.parts]) {
-      if (want[slot] !== p.id) {
-        this.root.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose();
-        if (p.soft) { this.root.remove(p.soft); p.soft.material.dispose(); }
-        this.parts.delete(slot);
-      }
-    }
+    // 1) build every new part off-scene
+    const fresh = [];
     for (const [slot, id, proxy] of loaded) {
-      if (this.parts.has(slot)) continue;
+      if (this.parts.get(slot)?.id === id) continue;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(proxy.nR * 3), 3));
       g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(proxy.nR * 3), 3));
@@ -338,18 +344,26 @@ export class Avatar {
       const mesh = this._skinned(g, this._material(slot, proxy.meta), 'Part_' + slot);
       if (slot === 'brows' || slot === 'lashes') { mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = 2; }
       if (slot === 'glasses') mesh.renderOrder = 3;
-      if (mesh.morphTargetInfluences && this.body.morphTargetInfluences) this.body.morphTargetInfluences.forEach((v, i) => { mesh.morphTargetInfluences[i] = v; });
-      this.root.add(mesh);
       const part = { id, mesh, proxy, P: new Float32Array(proxy.nP * 3) };
-      if (slot === 'hair' && CONFIG.hairSoftPass) {
+      if (slot === 'hair' && CONFIG.hairSoftPass && !proxy.gen) {
         part.soft = this._skinned(g, this._softHair(mesh.material), 'Part_hair_soft');
         part.soft.castShadow = false; part.soft.receiveShadow = false; part.soft.renderOrder = 1; part.soft.userData.noExport = true;
-        this.root.add(part.soft);
       }
+      fresh.push([slot, part]);
+    }
+    // 2) wait until their textures are loaded; the old parts stay on screen meanwhile
+    await this.texturesReady();
+    if (version !== this._partsVersion) { for (const [, p] of fresh) { p.mesh.geometry.dispose(); p.mesh.material.dispose(); } return; }
+    // 3) swap in one step: nothing is ever shown half-dressed
+    const drop = (p) => { this.root.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); if (p.soft) { this.root.remove(p.soft); p.soft.material.dispose(); } };
+    for (const [slot, p] of [...this.parts]) if (want[slot] !== p.id) { drop(p); this.parts.delete(slot); }
+    for (const [slot, part] of fresh) {
+      if (part.mesh.morphTargetInfluences && this.body.morphTargetInfluences) this.body.morphTargetInfluences.forEach((v, i) => { part.mesh.morphTargetInfluences[i] = v; });
+      this.root.add(part.mesh); if (part.soft) this.root.add(part.soft);
       this.parts.set(slot, part);
     }
     this._updateBodyMask();
-    this.dirty.shape = true;
+    this.rebuild();          // positions for the new parts before the next frame is drawn
   }
 
   _updateBodyMask() {

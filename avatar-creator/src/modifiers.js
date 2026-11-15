@@ -12,7 +12,7 @@ export const DEFAULT_STATE = () => ({
     base: 'young_lightskinned_male', tone: null, wrinkles: 0,
     freckles: 0, bodyFreckles: 0, freckleSeed: 1,
     lipColor: '#b0564f', lipStrength: 0, blush: 0, blushColor: '#d9665f',
-    shadow: 0, shadowColor: '#5b4a6b', beard: 0, underColor: '#e9e6e1', underTop: 'auto',
+    shadow: 0, shadowColor: '#5b4a6b', beard: 0, underColor: '#e4e1dc',
     moles: [], tattoos: [],
   },
   anim: 'idle',
@@ -174,6 +174,8 @@ export function targetWeights(state) {
     for (const hk of ['minheight', 'maxheight']) add(`macrodetails/height/${gk}-${ak}-averagemuscle-averageweight-${hk}`, ga * he[hk]);
     for (const pk of ['uncommonproportions', 'idealproportions']) add(`macrodetails/proportions/${gk}-${ak}-averagemuscle-averageweight-${pk}`, ga * pr[pk]);
   }
+  // School-safe body: anatomical detail that would show through the painted base layer is always smoothed away.
+  add('breast/nipple-size-decr', 1); add('breast/nipple-point-decr', 1); add('pelvis/bulge-decr', 1.6);
   // above average, "Muskelmasse" also sharpens definition (the macro alone mostly adds bulk)
   const def = Math.max(0, 2 * m.muscle - 1) * 0.85;
   if (def > 0) for (const t of ['stomach/stomach-tone', 'torso/torso-muscle-pectoral', 'torso/torso-muscle-dorsi', 'armslegs/l-upperarm-muscle', 'armslegs/r-upperarm-muscle',

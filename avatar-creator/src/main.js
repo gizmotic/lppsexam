@@ -76,7 +76,7 @@ const app = {
   async setState(next) {
     for (const k of Object.keys(state)) delete state[k];
     Object.assign(state, mergeState(DEFAULT_STATE(), next));
-    await avatar.syncParts(); avatar.applyColors(); app.skinChanged(); avatar.dirty.shape = true; avatar.update();
+    await avatar.syncParts(); await avatar.applyColors(); app.skinChanged(); avatar.dirty.shape = true; avatar.update();
     animator.rebuild(); animator.current = null; animator.play(state.anim, 0);
     app.listeners.forEach((f) => f());
     app.save();
@@ -184,6 +184,8 @@ renderer.setAnimationLoop(() => {
 });
 
 // warm every shader before the first interaction, then reveal
+await avatar.texturesReady();
+for (let i = 0; i < 200 && !skin.ready; i++) await new Promise((r) => setTimeout(r, 25));   // never reveal before the skin (with its base layer) is composed
 await renderer.compileAsync(scene, camera);
 document.getElementById('loading').classList.add('hidden');
 window.__ready = true;

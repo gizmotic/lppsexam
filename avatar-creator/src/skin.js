@@ -106,10 +106,14 @@ void main(){
   if (uHasPos > 0.5) {
     // crisp edges from the rest-pose position of each texel (decimetres, origin at mid body)
     vec4 bp = texture2D(uPos, vUv); float e = 0.012, ax = abs(bp.x);
-    float inB = smoothstep(-0.96 - e, -0.96 + e, bp.y) * (1.0 - smoothstep(uWaist - e, uWaist + e, bp.y)) * step(ax, 2.6);
-    float inT = smoothstep(3.36 - e, 3.36 + e, bp.y) * (1.0 - smoothstep(4.74 - e, 4.74 + e, bp.y)) * (1.0 - smoothstep(1.56 - e, 1.56 + e, ax));
-    float bandB = 1.0 - smoothstep(0.0, 0.11, min(bp.y + 0.96, uWaist - bp.y));
-    float bandT = 1.0 - smoothstep(0.0, 0.09, min(min(bp.y - 3.36, 4.74 - bp.y), 1.56 - ax));
+    // shorts: mid-thigh to waist
+    float inB = smoothstep(-1.45 - e, -1.45 + e, bp.y) * (1.0 - smoothstep(1.2 - e, 1.2 + e, bp.y)) * step(ax, 2.9);
+    // undershirt: waist to shoulders, sleeveless, round neckline
+    float armhole = mix(1.62, 1.12, smoothstep(4.25, 5.3, bp.y));
+    float neck = length(vec2(bp.x, (bp.y - 5.78) * 0.9));
+    float inT = smoothstep(0.9 - e, 0.9 + e, bp.y) * (1.0 - smoothstep(5.95 - e, 5.95 + e, bp.y)) * (1.0 - smoothstep(armhole - e, armhole + e, ax)) * smoothstep(0.80 - e, 0.80 + e, neck);
+    float bandB = 1.0 - smoothstep(0.0, 0.10, bp.y + 1.45);
+    float bandT = max(1.0 - smoothstep(0.0, 0.07, neck - 0.80), 1.0 - smoothstep(0.0, 0.07, armhole - ax));
     mb = inB * bp.a; mt = inT * bp.a; hem = max(mb * bandB, mt * bandT);
   }
   float ub = max(mb * uUnderBottom, mt * uUnderTop);
@@ -189,8 +193,10 @@ export class SkinCompositor {
       // face freckles: nose bridge and cheeks
       A[4 * v + 3] = y > 6.2 ? front * Math.exp(-(((y - 7.02) / 0.3) ** 2)) * Math.exp(-((x / 0.8) ** 2)) : 0;
       // underwear
-      M[4 * v] = ss(-1.0, -0.86, y) * ss(1.08, 0.96, y) * (wsum(v, legs) > 0.5 ? 1 : 0);
-      M[4 * v + 1] = ss(3.2, 3.36, y) * ss(4.82, 4.66, y) * (wsum(v, torso) > 0.55 && ax < 1.7 ? 1 : 0);
+      // base layer (fallback when no float render target is available; the shader normally uses the position map)
+      const armhole = 1.62 + (1.12 - 1.62) * ss(4.25, 5.3, y), neckR = Math.hypot(x, (y - 5.78) * 0.9);
+      M[4 * v] = y > -1.45 && y < 1.2 && ax < 2.9 ? 1 : 0;
+      M[4 * v + 1] = y > 0.9 && y < 5.95 && ax < armhole && neckR > 0.8 ? 1 : 0;
       // beard: jaw, chin, upper lip
       const side = ss(-0.1, 0.7, z) * ss(1.05, 0.7, ax);
       M[4 * v + 2] = y > 5.7 && y < 7 ? side * ss(7.2, 6.5, y - 0.12 * Math.max(0, 0.5 - ax)) * ss(5.85, 6.1, y + 0.25 * Math.max(0, z - 0.8)) : 0;
@@ -292,10 +298,9 @@ export class SkinCompositor {
     raw(ctx.hairColor, u.uHairColor.value); raw(s.underColor, u.uUnderColor.value);
     u.uFreckles.value = s.freckles; u.uBodyFreckles.value = s.bodyFreckles; u.uSeed.value = s.freckleSeed;
     u.uLip.value = s.lipStrength; u.uBlush.value = s.blush; u.uShadow.value = s.shadow; u.uBeard.value = s.beard;
-    u.uUnderBottom.value = CONFIG.underwear ? 1 : 0;
-    u.uWaist.value = ctx.hipsCovered ? 0.45 : 0.9;   // stays below a low waistband
-    // auto: only when nothing covers the chest, so it never peeks out of a neckline
-    u.uUnderTop.value = CONFIG.underwear && (s.underTop === 'on' || (s.underTop === 'auto' && ctx.gender < 0.5 && !ctx.chestCovered)) ? 1 : 0;
+    // School use: the painted base layer (undershirt + shorts) is part of the skin texture and always on.
+    // It does not depend on which garments are worn or loaded, so the body is never shown unclothed.
+    u.uUnderBottom.value = 1; u.uUnderTop.value = 1;
     const moles = CONFIG.moles ? s.moles.slice(0, MAX_MOLES) : [];
     moles.forEach((m, i) => u.uMoles.value[i].set(m.u, m.v, m.r, m.d));
     u.uMoleCount.value = moles.length;

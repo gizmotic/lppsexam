@@ -1,6 +1,8 @@
 // Every feature is a switch. Turn off here, never delete code.
 export const CONFIG = {
   port: 5199,
+  schoolSafe: true,        // school use: every figure always wears a top and trousers/skirt (no "none"); the painted base layer is on regardless
+  defaultTop: 'male_casualsuit04_top', defaultBottom: 'male_casualsuit02_bottom',
   skinSize: 2048,          // composited skin texture size
   shadows: true,
   skinDetailNormal: true,  // tiling pore normal map
@@ -11,7 +13,6 @@ export const CONFIG = {
   autoBlink: true,
   moles: true,             // click-to-place "Punkterl"
   tattoos: true,
-  underwear: true,         // painted base layer so the body is never bare
   autosave: true,          // localStorage
   glbAnimations: true,     // bake clips into exported GLB
   turntableOnIdle: false,

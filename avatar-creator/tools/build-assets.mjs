@@ -170,7 +170,7 @@ const keep = (rel) => {
   if (['genitals', 'measure', 'bodyshapes', 'asym'].includes(top)) return false;
   if (top === 'expression') return rel.startsWith('expression/units/caucasian/');
   if (rel.startsWith('macrodetails/height/') || rel.startsWith('macrodetails/proportions/')) return rel.includes('averagemuscle-averageweight');
-  if (top === 'pelvis') return rel.includes('pelvis-tone');
+  if (top === 'pelvis') return rel.includes('pelvis-tone') || rel.endsWith('bulge-decr');   // bulge-decr is applied always (school-safe body)
   return true;
 };
 const tbin = new Bin(); const targets = {}; let tcount = 0;

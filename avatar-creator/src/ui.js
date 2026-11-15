@@ -168,12 +168,12 @@ export function buildUI(app) {
       sub('Haarfarbe'), colorRow('hair', HAIR_COLORS),
     ] },
     { id: 'clothes', label: 'Kleidung', cam: 'full', build: () => [
-      section('Oberteile', 'upper', partGrid('top', { none: 'Keines' }), sub('Farbe'), colorRow('top', CLOTH_COLORS, 'Original')),
-      section('Hosen & Röcke', 'lower', partGrid('bottom', { none: 'Keine' }), sub('Farbe'), colorRow('bottom', CLOTH_COLORS, 'Original')),
+      section('Oberteile', 'upper', partGrid('top', CONFIG.schoolSafe ? {} : { none: 'Keines' }), sub('Farbe'), colorRow('top', CLOTH_COLORS, 'Original')),
+      section('Hosen & Röcke', 'lower', partGrid('bottom', CONFIG.schoolSafe ? {} : { none: 'Keine' }), sub('Farbe'), colorRow('bottom', CLOTH_COLORS, 'Original')),
       section('Kleider & Outfits', 'full', note('Ein Outfit ersetzt Oberteil und Hose.'), partGrid('full', { none: 'Keines' }), sub('Farbe'), colorRow('full', CLOTH_COLORS, 'Original')),
       section('Schuhe', 'feet', partGrid('shoes', { none: 'Barfuß' }), sub('Farbe'), colorRow('shoes', CLOTH_COLORS, 'Original')),
-      section('Unterwäsche', 'mid', sub('Farbe'), swatches(['#e9e6e1', '#1d1d20', '#6b7280', '#b23b3b', '#2d6fb0', '#d16a9a'], () => state.skin.underColor, (c) => { state.skin.underColor = c; app.skinChanged(); }),
-        sub('Oberteil'), (() => { const sel = h('select', { class: 'sel', onchange: () => { state.skin.underTop = sel.value; app.skinChanged(); } }, h('option', { value: 'auto' }, 'Automatisch'), h('option', { value: 'on' }, 'An'), h('option', { value: 'off' }, 'Aus')); sync(() => { sel.value = state.skin.underTop; }); return sel; })()),
+      section('Grundkleidung', 'full', note('Unterhemd und Shorts sind fest Teil jeder Figur und lassen sich nicht ausziehen.'),
+        sub('Farbe'), swatches(['#e4e1dc', '#1d1d20', '#6b7280', '#b23b3b', '#2d6fb0', '#3f8f5a', '#d16a9a', '#e3c14a'], () => state.skin.underColor, (c) => { state.skin.underColor = c; app.skinChanged(); })),
     ] },
     { id: 'deco', label: 'Deko', cam: 'upper', build: () => [
       section('Hüte', 'hair', partGrid('hat', { none: 'Keiner' }), sub('Farbe'), colorRow('hat', CLOTH_COLORS, 'Original')),
