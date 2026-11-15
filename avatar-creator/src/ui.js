@@ -94,7 +94,10 @@ export function buildUI(app) {
     return slider(s[0], () => state.mods[key] || 0, (v) => { if (v) state.mods[key] = v; else delete state.mods[key]; app.shapeChanged(); }, single ? { min: 0, max: 1 } : {});
   });
   const group = (id) => GROUPS.find((g) => g.id === id);
-  const partItems = (slot) => Object.entries(D.proxies).filter(([, p]) => p.slot === slot).map(([id, p]) => ({ id, label: p.label, thumb: p.thumb ? url(p.thumb) : null, title: `${p.label} — ${p.credit}` }));
+  // brows and lashes: the stroke texture itself reads better than the tiny bundled preview
+  const partItems = (slot) => Object.entries(D.proxies).filter(([, p]) => p.slot === slot).map(([id, p]) => (slot === 'brows' || slot === 'lashes'
+    ? { id, label: p.label, cls: 'stroke', style: { backgroundImage: `url(${url(p.map)})` }, title: `${p.label} — ${p.credit}` }
+    : { id, label: p.label, thumb: p.thumb ? url(p.thumb) : null, title: `${p.label} — ${p.credit}` }));
   const partGrid = (slot, opts = {}) => grid(partItems(slot), () => state.parts[slot], (id) => {
     state.parts[slot] = id;
     if ((slot === 'top' || slot === 'bottom') && id) state.parts.full = null;

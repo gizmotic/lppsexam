@@ -104,3 +104,4 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } #toast, #loading { transition: none; } }
 
 .tile .ph.skin { background-size: 560%; background-position: 87% 50%; transform: rotate(90deg) scale(1.2); }
+.tile .ph.stroke { background-size: 190%; background-position: 8% 50%; background-color: #f1e3d6; }
