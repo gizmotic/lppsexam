@@ -15,7 +15,8 @@ const VERT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = v
 const FRAG = /* glsl */`
 precision highp float;
 varying vec2 vUv;
-uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uMaskC, uAtlas, uPos;
+uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uMaskC, uAtlas, uPos, uFaceTex;
+uniform float uFaceOn;
 uniform vec3 uScalp;
 uniform float uHasPos, uWaist;
 uniform float uAgeMix, uFreckles, uBodyFreckles, uSeed, uLip, uBlush, uShadow, uBeard, uUnderTop, uUnderBottom;
@@ -54,6 +55,15 @@ void main(){
   c = mix(c, mix(c * relief, older, 0.25), uAgeMix);
   c *= uToneMul;
   c = mix(vec3(dot(c, vec3(0.3, 0.59, 0.11))), c, 0.9);   // the sources are a touch oversaturated for a lit scene
+  // own head scan (cylindrical map, face in the middle): replaces the skin from the crown to the neck.
+  // u = azimuth around the skull axis, v = height; both measured on the unmorphed base head, so the texture rides on the mesh.
+  if (uFaceOn > 0.5 && uHasPos > 0.5) {
+    vec4 fp = texture2D(uPos, vUv);
+    float phi = atan(fp.x, fp.z - 0.5);
+    vec2 fuv = vec2(0.5 + phi / 6.2831853, clamp(0.435 + (7.28 - fp.y) * 0.3, 0.0, 1.0));
+    float fw = fp.a * smoothstep(5.55, 6.2, fp.y) * (1.0 - smoothstep(2.0, 2.35, abs(phi))) * (1.0 - smoothstep(1.05, 1.45, abs(fp.x) * step(fp.y, 6.3)));
+    c = mix(c, texture2D(uFaceTex, fuv).rgb, fw);
+  }
   // fine detail the 512px source cannot carry: pores and faint mottling
   float pores = vnoise(vUv * 1500.0) * 0.6 + vnoise(vUv * 3100.0) * 0.4;
   c *= 1.0 + (pores - 0.5) * 0.035;
@@ -62,7 +72,7 @@ void main(){
   // blush
   c *= mix(vec3(1.0), mix(vec3(1.0), uBlushColor / max(lum(uBlushColor), 0.2) * 0.94, 0.55), clamp(mA.g * uBlush * 0.7, 0.0, 1.0));
   // lash line: the source skin has a saturated orange lid rim; settle it into a soft neutral shadow
-  float rim = smoothstep(0.35, 0.9, mA.b);
+  float rim = smoothstep(0.35, 0.9, mA.b) * (1.0 - uFaceOn);   // not for an own head scan: it has its own lids
   c = mix(c, vec3(lum(c)) * vec3(0.80, 0.70, 0.68), rim * 0.55);
   // eye shadow
   float lid = smoothstep(0.12, 0.55, mA.b) * uShadow;
@@ -172,7 +182,7 @@ export class SkinCompositor {
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
       uniforms: {
-        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uMaskC: { value: this.maskC.texture }, uScalp: { value: new THREE.Vector3(0, -90, -89) }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 }, uWaist: { value: 0.9 },
+        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uMaskC: { value: this.maskC.texture }, uFaceTex: { value: null }, uFaceOn: { value: 0 }, uScalp: { value: new THREE.Vector3(0, -90, -89) }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 }, uWaist: { value: 0.9 },
         uAgeMix: { value: 0 }, uFreckles: { value: 0 }, uBodyFreckles: { value: 0 }, uSeed: { value: 1 }, uLip: { value: 0 }, uBlush: { value: 0 },
         uShadow: { value: 0 }, uBeard: { value: 0 }, uUnderTop: { value: 0 }, uUnderBottom: { value: 1 },
         uOldMul: { value: new THREE.Vector3(1, 1, 1) }, uOldMulFace: { value: new THREE.Vector3(1, 1, 1) }, uToneMul: { value: new THREE.Vector3(1, 1, 1) }, uLipColor: { value: new THREE.Color() }, uBlushColor: { value: new THREE.Color() },
@@ -292,6 +302,81 @@ export class SkinCompositor {
     return t;
   }
 
+  // Own head texture (cylindrical map with the face in the middle, hair and brows baked in is fine):
+  // hair, brows and lashes are painted over with the surrounding skin so the avatar's own hair, brows and eyes can be used.
+  // The image stays in memory only. Returns false if the image is unusable.
+  setFaceTexture(img) {
+    if (!img) { this.faceCanvas = null; this.faceAvg = null; this.material.uniforms.uFaceOn.value = 0; this.dirty = true; return true; }
+    const W = 1024, H = Math.round((W * (img.naturalHeight || img.height)) / (img.naturalWidth || img.width));
+    if (!(H > 256) || H > 1400) return false;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, W, H);
+    const id = ctx.getImageData(0, 0, W, H), d = id.data, n = W * H;
+    const lum = (i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+    // reference skin: median of the cheeks (left and right of nose and mouth)
+    const sample = [];
+    for (let y = Math.round(H * 0.5); y < H * 0.64; y += 3) for (const [a, b] of [[0.37, 0.44], [0.56, 0.63]]) for (let x = Math.round(W * a); x < W * b; x += 3) sample.push(lum(4 * (y * W + x)));
+    sample.sort((p, q) => p - q);
+    const refL = sample[sample.length >> 1] || 128;
+    // reference skin colour (median per channel over the same cheek patches)
+    const chan = [[], [], []];
+    for (let y = Math.round(H * 0.5); y < H * 0.64; y += 3) for (const [a, b] of [[0.37, 0.44], [0.56, 0.63]]) for (let x = Math.round(W * a); x < W * b; x += 3) for (let k = 0; k < 3; k++) chan[k].push(d[4 * (y * W + x) + k]);
+    const skin = chan.map((a) => { a.sort((p, q) => p - q); return a[a.length >> 1] || 128; });
+    const fch = [[], [], []];           // forehead (above the brows), skin pixels only
+    for (let y = Math.round(H * 0.27); y < H * 0.36; y += 2) for (let x = Math.round(W * 0.44); x < W * 0.56; x += 2) { const i = 4 * (y * W + x); if (lum(i) > refL * 0.8) for (let k = 0; k < 3; k++) fch[k].push(d[i + k]); }
+    const foreSkin = fch.map((a, k) => { a.sort((p, q) => p - q); return a.length > 20 ? a[a.length >> 1] : skin[k]; });
+    this.faceDebug = { skin, foreSkin };
+    // hair mask: clearly darker than the cheeks, except around nose and mouth (nostrils, lip line, stubble stay as they are)
+    const mask = new Float32Array(n);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const u = x / W, v = y / H, i = y * W + x, protectedBox = u > 0.43 && u < 0.57 && v > 0.5 && v < 0.78;
+      const l = lum(4 * i);
+      mask[i] = protectedBox ? 0 : l < refL * 0.64 ? 1 : l < refL * 0.8 ? (refL * 0.8 - l) / (refL * 0.16) : 0;
+      if (l < 14 && v > 0.7) mask[i] = 1;                          // black background below the scan: not skin at all
+    }
+    // the scan's own eyeballs: the avatar has real eye meshes, so the painted eyes (and lids around them) are replaced by skin
+    for (const eu of [0.4375, 0.5625]) {
+      const cx = eu * W, cy = 0.435 * H;
+      for (let y = Math.max(0, Math.round(cy - 34)); y < Math.min(H, cy + 34); y++) for (let x = Math.max(0, Math.round(cx - 54)); x < Math.min(W, cx + 54); x++) {
+        const e = Math.hypot((x - cx) / 44, (y - cy) / 25); if (e < 1.25) mask[y * W + x] = Math.max(mask[y * W + x], Math.min(1, (1.25 - e) * 4));
+      }
+    }
+    const boxBlur = (src, r, passes = 2) => {
+      let a = Float32Array.from(src), b = new Float32Array(n);
+      for (let p = 0; p < passes; p++) {
+        for (let y = 0; y < H; y++) { let acc = 0; const row = y * W; for (let x = -r; x < W; x++) { if (x + r < W) acc += a[row + x + r]; if (x - r - 1 >= 0) acc -= a[row + x - r - 1]; if (x >= 0) b[row + x] = acc / (Math.min(W - 1, x + r) - Math.max(0, x - r) + 1); } }
+        for (let x = 0; x < W; x++) { let acc = 0; for (let y = -r; y < H; y++) { if (y + r < H) acc += b[(y + r) * W + x]; if (y - r - 1 >= 0) acc -= b[(y - r - 1) * W + x]; if (y >= 0) a[y * W + x] = acc / (Math.min(H - 1, y + r) - Math.max(0, y - r) + 1); } }
+      }
+      return a;
+    };
+    const grown = boxBlur(mask, 3, 1); for (let i = 0; i < n; i++) grown[i] = Math.min(1, grown[i] * 2.2);     // grow over the soft edge of strands
+    // fill: normalised blur of the skin pixels only
+    const ch = [0, 1, 2].map((k) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = d[4 * i + k] * (1 - grown[i]); return boxBlur(a, 26, 2); });
+    const wgt = boxBlur(Float32Array.from(grown, (m) => 1 - m), 26, 2);
+    let seed = 3; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const avg = [0, 0, 0]; let na = 0;
+    for (let i = 0; i < n; i++) {
+      const m = grown[i], w = wgt[i];
+      for (let k = 0; k < 3; k++) {
+        // fill = cheek colour scaled by the brightness of the surrounding skin: nearby red lids or dark shadows cannot tint the patch
+        const nb = w > 0.03 ? (0.3 * ch[0][i] + 0.59 * ch[1][i] + 0.11 * ch[2][i]) / w : refL;
+        const base = (i / W) / H < 0.5 ? foreSkin[k] : skin[k];
+        const fill = base * Math.min(1.2, Math.max(0.75, nb / refL)), noise = (rnd() - 0.5) * 7;
+        d[4 * i + k] = Math.max(0, Math.min(255, d[4 * i + k] * (1 - m) + (fill + noise) * m));
+      }
+      d[4 * i + 3] = 255;
+    }
+    for (let y = Math.round(H * 0.5); y < H * 0.64; y += 3) for (const [a, b] of [[0.37, 0.44], [0.56, 0.63]]) for (let x = Math.round(W * a); x < W * b; x += 3) { const i = 4 * (y * W + x); avg[0] += d[i]; avg[1] += d[i + 1]; avg[2] += d[i + 2]; na++; }
+    ctx.putImageData(id, 0, 0);
+    this.faceCanvas = cv; this.faceAvg = avg.map((x) => x / na / 255); this.faceRefL = refL;
+    if (this.faceTexture) this.faceTexture.dispose();
+    const t = this.faceTexture = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.NoColorSpace; t.anisotropy = 8; t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+    this.material.uniforms.uFaceTex.value = t; this.material.uniforms.uFaceOn.value = this.posMap ? 1 : 0;
+    this.dirty = true;
+    return !!this.posMap;
+  }
+
   oldVariant(id) {
     const m = id.match(/^(young|middleage|old)_(\w+?)_(female|male)(\d*)$/);
     if (!m) return id;
@@ -310,7 +395,8 @@ export class SkinCompositor {
     if (avg && avgOld) u.uOldMul.value.set(avg[0] / avgOld[0], avg[1] / avgOld[1], avg[2] / avgOld[2]); else u.uOldMul.value.set(1, 1, 1);
     const fa = this.avgFace.get(s.base), fo = this.avgFace.get(this.oldVariant(s.base));
     if (fa && fo) u.uOldMulFace.value.set(fa[0] / fo[0], fa[1] / fo[1], fa[2] / fo[2]); else u.uOldMulFace.value.copy(u.uOldMul.value);
-    if (s.tone && avg) { const t = new THREE.Color(s.tone).convertLinearToSRGB(); u.uToneMul.value.set(t.r / avg[0], t.g / avg[1], t.b / avg[2]); }
+    if (this.faceAvg && avg) u.uToneMul.value.set(this.faceAvg[0] / avg[0], this.faceAvg[1] / avg[1], this.faceAvg[2] / avg[2]);   // neck and body match the head scan
+    else if (s.tone && avg) { const t = new THREE.Color(s.tone).convertLinearToSRGB(); u.uToneMul.value.set(t.r / avg[0], t.g / avg[1], t.b / avg[2]); }
     else u.uToneMul.value.set(1, 1, 1);
     // THREE.Color parses hex as sRGB -> linear; the compositor works on raw sRGB values
     const raw = (hex, target) => { const c = new THREE.Color(hex); c.convertLinearToSRGB(); target.copy(c); };

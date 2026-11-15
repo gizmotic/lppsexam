@@ -17,6 +17,7 @@ export const CONFIG = {
   hiddenParts: ['short01', 'short02', 'short03', 'short04', 'bob01', 'bob02', 'long01', 'ponytail01', 'braid01', 'afro01'],
   expressions: true,       // blink / smile morph targets
   autoBlink: true,
+  faceTexture: true,       // import an own head scan as skin (stays in memory, never uploaded or saved)
   moles: true,             // click-to-place "Punkterl"
   tattoos: true,
   autosave: true,          // localStorage

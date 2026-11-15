@@ -44,3 +44,17 @@
 23. **Zufall würfelt jeden Gesichtsregler einzeln** (meist klein, jeder fünfte kräftig) plus Kopfform-Typ, Körperbau-Mix,
     Alter, Haut und Haare.
 24. **Veröffentlichte Vorschau als Seite:** Binärdateien dort unter `.wasm`, weil `.bin` nicht ausgeliefert wird.
+
+## Schulbetrieb, Haare, eigene Kopftextur
+
+25. **Kleidung ist Pflicht, die aufgemalte Grundschicht ist aus** (`paintedBase: false`). Oberteil und Hose/Rock lassen sich nicht
+    entfernen; ein Wechsel tauscht erst, wenn das neue Teil samt Textur geladen ist (Test: kein Frame ohne Kleidung).
+    Die weiße Haut an Kurztops und Röcken entfällt dadurch. Brustwarzen und Becken-Wölbung sind immer geglättet.
+26. **Rock/Hose werden unter dem Saum des Oberteils abgeschnitten** (Saum = tiefster Punkt in der Rumpfmitte, Ärmel ausgenommen),
+    sonst ragt der Rock durchs T-Shirt. Ein kurzes Top hat den Saum über dem Bund: dann bleibt alles stehen.
+27. **Frisuren sind erzeugt** (`src/hair.js`, 27 Stile) auf der Kopfhaut des Avatars: Haaransatz-Linie, Dicke-Feld, Längen, Anbauteile
+    (Dutt, Zopf, Locken). Kurze Haare (Buzz, Fade-Seiten) sind in die Haut gemalt. Sie folgen allen Kopfreglern.
+28. **Eigene Kopftextur** (`setFaceTexture`): Kopf-Abwicklung (Gesicht in der Mitte) wird auf den Basiskopf zylindrisch projiziert
+    (u = Azimut, v = Höhe, gemessen auf dem unveränderten Kopf – Augenabstand und Ohrenlage passen ohne Anpassung). Haare, Brauen,
+    Augäpfel und der schwarze Hintergrund werden mit Wangenfarbe und örtlicher Helligkeit übermalt. Körperhaut zieht die Farbe nach.
+    Das Bild bleibt im Speicher (nicht hochgeladen, nicht gespeichert, nicht im JSON).

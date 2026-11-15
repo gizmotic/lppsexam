@@ -139,6 +139,20 @@ export function buildUI(app) {
         () => state.skin.base, (id) => { state.skin.base = id; app.skinChanged(); }),
       sub('Hautton'), swatches(SKIN_TONES, () => state.skin.tone, (c) => { state.skin.tone = c; app.skinChanged(); }, { none: 'Original' }),
       skinSlider('Falten & Alterung', 'wrinkles'),
+      CONFIG.faceTexture && section('Eigene Gesichtstextur', 'face', (() => {
+        const file = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, id: 'face-file', onchange: async () => {
+          const f = file.files[0]; if (!f) return; file.value = '';
+          try {
+            const img = new Image(); const url = URL.createObjectURL(f); img.src = url; await img.decode(); URL.revokeObjectURL(url);
+            if (!app.skin.setFaceTexture(img)) { app.toast('Das Bild passt nicht: Kopf-Abwicklung (Gesicht in der Mitte, Querformat) erwartet'); return; }
+            app.skinChanged(); state.skin.freckles = 0; state.skin.beard = 0; syncers.forEach((fn) => fn()); status.textContent = 'Geladen: ' + f.name; app.toast('Gesichtstextur geladen');
+          } catch { app.toast('Bild konnte nicht gelesen werden'); }
+        } });
+        const status = h('p', { class: 'note' }, 'Keine eigene Textur.');
+        return [note('Kopf-Abwicklung als Bild (Gesicht in der Mitte, Ohren links und rechts, Querformat). Haare, Augenbrauen und Wimpern aus dem Bild werden übermalt – Frisur, Brauen und Augen kommen aus dem Baukasten. Nase und Mund formst du mit den Reglern. Das Bild bleibt auf diesem Gerät: es wird nicht hochgeladen und nicht gespeichert.'),
+          h('div', { class: 'quick' }, h('button', { class: 'btn', onclick: () => file.click() }, 'Bild wählen'), h('button', { class: 'btn', onclick: () => { app.skin.setFaceTexture(null); app.skinChanged(); status.textContent = 'Keine eigene Textur.'; } }, 'Entfernen')), file, status,
+          note('Nur Bilder verwenden, an denen du die Rechte hast – bei echten Personen (vor allem Kindern) nur mit Einverständnis.')];
+      })()),
       section('Sommersprossen', 'face', skinSlider('Gesicht', 'freckles'), skinSlider('Schultern & Arme', 'bodyFreckles'),
         h('button', { class: 'btn', onclick: () => { state.skin.freckleSeed = 1 + Math.floor(Math.random() * 97); app.skinChanged(); } }, 'Neu verteilen')),
       CONFIG.moles && section('Punkterl & Muttermale', 'face', (() => {

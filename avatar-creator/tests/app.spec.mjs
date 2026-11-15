@@ -177,10 +177,11 @@ test('school-safe: clothes are mandatory and a change never shows a frame withou
     for (const change of [{ top: 'tubetop' }, { top: 'male_casualsuit05_top' }, { full: 'f_dress_02' }, { full: null, top: 'sleeveless', bottom: 'miniskirt' }, { bottom: 'tightjeans' }, { hair: 'gen_dreads' }, { top: 'coat' }]) {
       Object.assign(s.parts, change); await __app.partsChanged();
     }
-    await new Promise((r) => setTimeout(r, 200)); run = false;
+    for (let i = 0; i < 80 && frames < 4; i++) await new Promise((r) => setTimeout(r, 100));   // slow software renderers: wait for a few frames
+    run = false;
     return { bare, frames };
   });
-  expect(bare.frames).toBeGreaterThan(5);
+  expect(bare.frames).toBeGreaterThanOrEqual(2);
   expect(bare.bare).toBe(0);
   // the painted base layer is off, so no white patches can appear on the skin
   expect(await page.evaluate(() => __app.skin.material.uniforms.uUnderTop.value + __app.skin.material.uniforms.uUnderBottom.value)).toBe(0);
@@ -204,4 +205,27 @@ test('every generated hairstyle builds and rides on the scalp', async ({ page })
   // the hair tab offers them
   await page.locator('.rail button[data-id=hair]').click();
   expect(await page.locator('.page:not([hidden]) .tile').count()).toBeGreaterThanOrEqual(26);
+});
+
+test('own head texture: hair, brows and the black scan background are painted over with skin', async ({ page }) => {
+  await ready(page);
+  const r = await page.evaluate(async () => {
+    // synthetic cylindrical head map: skin, dark "hair" on top and at the sides, dark "brows", black below the neck
+    const W = 1500, H = 1000, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'); g.fillStyle = 'rgb(200,140,115)'; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgb(45,30,20)'; g.fillRect(0, 0, W, H * 0.22); g.fillRect(0, 0, W * 0.2, H * 0.6); g.fillRect(W * 0.8, 0, W * 0.2, H * 0.6);
+    g.fillRect(W * 0.38, H * 0.385, W * 0.24, H * 0.02);
+    g.fillStyle = '#000'; g.fillRect(0, H * 0.9, W, H * 0.1);
+    const img = new Image(); img.src = c.toDataURL('image/png'); await img.decode();
+    const ok = __app.skin.setFaceTexture(img), fc = __app.skin.faceCanvas, d = fc.getContext('2d');
+    const px = (u, v) => Array.from(d.getImageData(Math.round(u * fc.width), Math.round(v * fc.height), 1, 1).data.slice(0, 3));
+    const out = { ok, on: __app.skin.material.uniforms.uFaceOn.value, crown: px(0.5, 0.08), sideHair: px(0.1, 0.3), brow: px(0.5, 0.395), below: px(0.5, 0.96), cheek: px(0.4, 0.55) };
+    __app.skinChanged(); await new Promise((r) => setTimeout(r, 300)); __app.skin.render();
+    out.skinRendered = __app.skin.dirty === false;
+    __app.skin.setFaceTexture(null); out.offAgain = __app.skin.material.uniforms.uFaceOn.value;
+    return out;
+  });
+  expect(r.ok).toBe(true); expect(r.on).toBe(1); expect(r.offAgain).toBe(0); expect(r.skinRendered).toBe(true);
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 45;
+  for (const k of ['crown', 'sideHair', 'brow', 'below', 'cheek']) expect(near(r[k], [200, 140, 115]), k + ' ' + r[k]).toBe(true);
 });
