@@ -254,7 +254,7 @@ export class Avatar {
     if (slot === 'hair' && meta.gen) {
       // generated hair: solid sculpted geometry, strand pattern as tint and relief
       const strands = hairTexture(meta.tex);
-      return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: meta.tex === 'strand' ? 2.2 : 3.2, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.6, envMapIntensity: 0.55, side: THREE.DoubleSide });
+      return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: meta.tex === 'strand' ? 4.2 : 3.4, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.6, envMapIntensity: 0.55, side: THREE.DoubleSide });
     }
     if (slot === 'hair') {
       // opaque core; the soft strand tips are drawn by a second, blended pass (see _softHair)

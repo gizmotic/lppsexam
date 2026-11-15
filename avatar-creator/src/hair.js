@@ -161,13 +161,13 @@ export const HAIR_STYLES = {
   gen_mullet: { label: 'Vokuhila', tex: 'strand', scalp: UNDER, thick: (h) => 0.08 + 0.16 * top(h) + 0.1 * back(h),
     hang: (h) => (h.aphi > 118 ? 1.25 * ss(118, 150, h.aphi) : h.aphi < 50 ? 0.22 * ss(50, 30, h.aphi) : 0), hangShape: { out: 0.3, curl: 0.12 } },
   gen_long: { label: 'Lang, Mittelscheitel', tex: 'strand', scalp: UNDER, thick: (h) => 0.13 * (h.th > 30 && h.z > -0.6 ? part(h, 0, 0.08) : 1) + 0.04,
-    hang: (h) => (h.aphi > 40 ? lerp(1.45, 3.3, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.3, curl: -0.05, behind: true } },
+    hang: (h) => (h.aphi > 40 ? lerp(2.8, 3.3, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.3, curl: -0.05, behind: true } },
   gen_long_fringe: { label: 'Lang mit Pony', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 + 0.03 * top(h),
-    hang: (h) => (h.aphi > 46 ? lerp(1.45, 3.0, ss(100, 150, h.aphi)) : 0.3 + 0.1 * ss(20, 46, h.aphi)), hangShape: { out: 0.28, curl: -0.06, behind: true } },
+    hang: (h) => (h.aphi > 46 ? lerp(2.7, 3.0, ss(100, 150, h.aphi)) : 0.3 + 0.1 * ss(20, 46, h.aphi)), hangShape: { out: 0.28, curl: -0.06, behind: true } },
   gen_bob: { label: 'Bob-Schnitt', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 * (h.th > 30 && h.z > -0.6 ? part(h, 0.3, 0.08) : 1) + 0.05,
     hang: (h) => (h.aphi > 36 ? lerp(1.05, 0.75, ss(100, 160, h.aphi)) * ss(36, 55, h.aphi) : 0), hangShape: { out: 0.45, curl: -0.3 } },
   gen_long_curly: { label: 'Lange Locken', tex: 'curl', scalp: UNDER, thick: (h) => 0.22 + 0.12 * top(h), bumps: [0.07, 9],
-    hang: (h) => (h.aphi > 38 ? lerp(1.4, 2.5, ss(100, 150, h.aphi)) * ss(38, 56, h.aphi) : 0), hangShape: { out: 0.7, curl: 0.15, wave: [0.11, 5.5], behind: true } },
+    hang: (h) => (h.aphi > 38 ? lerp(2.3, 2.6, ss(100, 150, h.aphi)) * ss(38, 56, h.aphi) : 0), hangShape: { out: 0.7, curl: 0.15, wave: [0.11, 5.5], behind: true } },
   gen_surfer: { label: 'Halblang, wellig', tex: 'strand', scalp: UNDER, thick: (h) => 0.14 + 0.08 * top(h),
     hang: (h) => (h.aphi > 52 ? lerp(0.95, 1.25, ss(100, 150, h.aphi)) * ss(52, 70, h.aphi) : h.aphi < 40 ? 0.2 * ss(40, 20, h.aphi) : 0), hangShape: { out: 0.5, curl: 0.2, wave: [0.07, 6] } },
   gen_pixie: { label: 'Pixie-Schnitt', tex: 'strand', scalp: UNDER, thick: (h) => 0.07 + 0.14 * top(h), offset: (h) => [0.05 * top(h), 0, 0.05 * front(h) * top(h)],
@@ -184,28 +184,28 @@ export const HAIR_STYLES = {
   gen_braids: { label: 'Geflochtene Zöpfe', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.085 * (h.th > 20 ? part(h, 0, 0.07) : 1) + 0.02,
     pieces: (m) => { m.tail({ phi: 118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: 1, front: true }); m.tail({ phi: -118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: -1, front: true }); } },
   // ---- styles from the reference sheets
-  gen_caesar: { label: 'Caesar Cut', tex: 'strand', scalp: UNDER, thick: (h) => 0.06 + 0.07 * top(h),
-    hang: (h) => (h.aphi < 46 ? 0.2 * ss(46, 24, h.aphi) : 0), hangShape: { out: 0.12, curl: -0.04 } },
+  gen_caesar: { label: 'Caesar Cut', tex: 'strand', scalp: UNDER, thick: (h) => 0.07 + 0.08 * top(h), bumps: [0.015, 12],
+    hang: (h) => (h.aphi < 40 ? 0.16 * ss(40, 20, h.aphi) * (0.7 + 0.3 * Math.sin(h.x * 17 + 0.6)) : 0), hangShape: { out: 0.1, curl: -0.03 } },
   gen_slick_back: { label: 'Nach hinten', tex: 'strand', uv: 'back', scalp: UNDER,
     thick: (h) => 0.12 + 0.08 * top(h) + 0.12 * ss(90, 20, h.aphi) * ss(20, 55, h.th), offset: (h) => { const k = front(h) * ss(15, 50, h.th); return [0, 0.03 * k, -0.1 * k]; },
     hang: (h) => (h.aphi > 115 ? 0.3 * ss(115, 150, h.aphi) : 0), hangShape: { out: 0.1, curl: 0.05 } },
   gen_quiff: { label: 'Tolle', tex: 'strand', uv: 'back', scalp: UNDER,
     thick: (h) => 0.1 + 0.08 * top(h) + 0.28 * ss(90, 20, h.aphi) * ss(22, 60, h.th) * ss(-0.3, 0.7, h.z), offset: (h) => { const k = front(h) * ss(22, 50, h.th); return [0, 0.03 * k, -0.06 * k]; } },
   gen_textured_fringe: { label: 'Strukturiert', tex: 'strand', scalp: FADE, region: (h) => (h.th - 8) * 0.02, edge: 'taper', bumps: [0.02, 10],
-    thick: (h) => 0.14 + 0.1 * top(h) + 0.08 * front(h), hang: (h) => (h.aphi < 48 ? 0.3 * ss(48, 22, h.aphi) * (0.7 + 0.3 * Math.sin(h.x * 14)) : 0), hangShape: { out: 0.22, curl: -0.08 } },
+    thick: (h) => 0.14 + 0.1 * top(h) + 0.08 * front(h), hang: (h) => (h.aphi < 42 ? 0.26 * ss(42, 14, h.aphi) * (0.45 + 0.55 * Math.abs(Math.sin(h.x * 9 + 0.4))) : 0), hangShape: { out: 0.22, curl: -0.08 } },
   gen_shoulder: { label: 'Schulterlang', tex: 'strand', scalp: UNDER, thick: (h) => (0.12 + 0.07 * top(h)) * (h.th > 30 && h.z > -0.6 ? part(h, 0.2, 0.09) : 1) + 0.03,
-    hang: (h) => (h.aphi > 38 ? lerp(1.3, 1.65, ss(100, 150, h.aphi)) * ss(38, 56, h.aphi) : 0.14 * ss(38, 20, h.aphi)), hangShape: { out: 0.45, curl: 0.1, wave: [0.05, 5], behind: true } },
+    hang: (h) => (h.aphi > 38 ? lerp(1.9, 1.7, ss(100, 150, h.aphi)) * ss(38, 56, h.aphi) : 0.14 * ss(38, 20, h.aphi)), hangShape: { out: 0.45, curl: 0.1, wave: [0.05, 5], behind: true } },
   gen_curly_mid: { label: 'Wellig & lockig', tex: 'curl', scalp: UNDER, thick: (h) => 0.24 + 0.1 * top(h), bumps: [0.07, 9],
     hang: (h) => (h.aphi > 40 ? lerp(0.85, 1.1, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.6, curl: 0.12, wave: [0.1, 6] } },
   gen_long_bob: { label: 'Langer Bob', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 * (h.th > 30 && h.z > -0.6 ? part(h, 0.3, 0.08) : 1) + 0.05,
     hang: (h) => (h.aphi > 34 ? lerp(1.5, 1.15, ss(100, 160, h.aphi)) * ss(34, 52, h.aphi) : 0), hangShape: { out: 0.35, curl: -0.15 } },
   gen_long_wavy: { label: 'Langes welliges Haar', tex: 'strand', scalp: UNDER, thick: (h) => 0.13 * (h.th > 30 && h.z > -0.6 ? part(h, 0, 0.08) : 1) + 0.05,
-    hang: (h) => (h.aphi > 40 ? lerp(1.6, 3.3, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.55, curl: 0.05, wave: [0.1, 5.5], behind: true } },
+    hang: (h) => (h.aphi > 40 ? lerp(2.9, 3.3, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.55, curl: 0.05, wave: [0.1, 5.5], behind: true } },
   gen_messy_bun: { label: 'Unordentlicher Dutt', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.1 + 0.06 * top(h), bumps: [0.03, 10],
     hang: (h) => (h.aphi > 26 && h.aphi < 80 && h.th < 42 ? 0.42 * ss(26, 38, h.aphi) * ss(80, 62, h.aphi) * (0.5 + 0.5 * Math.sin(h.phi * 0.7 + h.y * 5)) : 0), hangShape: { out: 0.3, curl: 0.2, wave: [0.1, 6] },
     pieces: (m) => m.ball({ phi: 180, th: 66, r: 0.5, lift: 0.3 }) },
   gen_shaggy: { label: 'Zotteliges Haar', tex: 'strand', scalp: UNDER, thick: (h) => 0.19 + 0.1 * top(h), bumps: [0.04, 7],
-    hang: (h) => (h.aphi > 34 ? lerp(1.4, 2.3, ss(100, 150, h.aphi)) * (0.8 + 0.25 * Math.sin(h.phi * 0.5 + h.y * 3)) * ss(34, 52, h.aphi) : 0.35 * ss(34, 16, h.aphi) * (0.7 + 0.3 * Math.sin(h.x * 11))), hangShape: { out: 0.55, curl: 0.1, wave: [0.12, 7], behind: true } },
+    hang: (h) => (h.aphi > 34 ? lerp(1.9, 2.4, ss(100, 150, h.aphi)) * (0.8 + 0.25 * Math.sin(h.phi * 0.5 + h.y * 3)) * ss(34, 52, h.aphi) : 0.35 * ss(34, 16, h.aphi) * (0.7 + 0.3 * Math.sin(h.x * 11))), hangShape: { out: 0.55, curl: 0.1, wave: [0.12, 7], behind: true } },
   gen_curly_bob: { label: 'Kurzes lockiges Haar', tex: 'curl', scalp: UNDER, thick: (h) => 0.3 + 0.1 * top(h), bumps: [0.08, 9],
     hang: (h) => (h.aphi > 34 ? lerp(0.95, 0.8, ss(100, 160, h.aphi)) * ss(34, 52, h.aphi) : 0), hangShape: { out: 0.75, curl: 0.1, wave: [0.1, 6] } },
 };
@@ -223,12 +223,13 @@ export function registerHair(D) {
 
 // ---------------------------------------------------------------- generator
 export function buildHair(D, id) {
-  const st = HAIR_STYLES[id], sc = scalp(D), fine = sc.fine;
+  let st = HAIR_STYLES[id]; const sc = scalp(D), fine = sc.fine;
   const info = (x, y, z, s) => { const h = headInfo(x, y, z); h.s = s; return h; };
   // 1) where the shell exists: hairline, optionally limited by the style's own region
   const nF = fine.verts.length, f = new Float32Array(nF);
   for (let i = 0; i < nF; i++) f[i] = st.region ? Math.min(fine.s[i], st.region(info(fine.pos[3 * i], fine.pos[3 * i + 1], fine.pos[3 * i + 2], fine.s[i]))) : fine.s[i];
   if (st.shell === false) f.fill(-1, 1);              // painted-only style: keep a single hidden vertex so the part stays a valid mesh
+  if (!st.bumps && st.tex === 'strand') st = { ...st, bumps: [0.012, 14] };
   const mesh = clipMesh(fine, f), nS = mesh.verts.length;
   // 2) base position, normal, head info per shell vertex
   const bp = new Float32Array(nS * 3), bn = new Float32Array(nS * 3), hs = new Array(nS), reg = new Float32Array(nS);
@@ -291,9 +292,14 @@ export function buildHair(D, id) {
         let o = (shape.out ?? 0.3) * 0.35 * Math.sin(Math.PI * Math.min(1, u * 1.15)) + (shape.curl ?? 0) * u * u * 0.6;
         if (shape.wave) o += shape.wave[0] * Math.sin(u * L * shape.wave[1] + h.phi * 0.09) * u;
         let x = out[3 * i] + rx * o * Math.min(1, L), z = out[3 * i + 2] + rz * o * Math.min(1, L);
-        if (shape.behind && y < 6.25) {             // long hair settles behind the shoulders instead of cutting through them
-          const k2 = ss(6.25, 5.3, y), bz = -0.95 - 0.25 * ss(5.9, 4.6, y);
-          z = lerp(z, Math.min(z, bz - 0.1 * Math.abs(rx)), k2); x = lerp(x, x * 0.82, k2);
+        if (shape.behind && y < 6.25) {
+          // below the head the hair has to go somewhere: strands from the back settle behind the shoulders,
+          // strands from the sides fall forward over the shoulders and chest (as in the reference photos)
+          const k2 = ss(6.25, 5.3, y), side = ss(125, 90, h.aphi);               // side = 1 at the temples/ears, 0 at the back
+          const bz = -0.95 - 0.25 * ss(5.9, 4.6, y), fz = 0.62 + 0.5 * ss(5.7, 4.5, y), sx = Math.sign(h.x || 1);
+          const zb = Math.min(z, bz - 0.1 * Math.abs(rx)), zf = Math.max(z, fz);
+          z = lerp(lerp(z, zb, k2), lerp(z, zf, k2), side);
+          x = lerp(x, lerp(x * 0.82, sx * Math.max(Math.abs(x), 0.98 + 0.12 * ss(5.6, 4.6, y)), side), k2);
         }
         col.push(add(i, x, y, z, u0, v0 + L * u * 0.55));
       }
