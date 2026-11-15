@@ -251,6 +251,11 @@ export class Avatar {
     if (slot === 'eyes') {
       return new THREE.MeshPhysicalMaterial({ map: this.eyeTexture(this.state.eyes.color), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, transparent: true, alphaTest: 0.02, envMapIntensity: 0.55 });
     }
+    if (slot === 'hat' && meta.gen) {
+      // generated head wear: plain cloth in the chosen colour
+      const t = this.state.colors.hat || meta.defaultColor || '#2d6fb0';
+      return new THREE.MeshStandardMaterial({ color: new THREE.Color(t), roughness: 0.82, envMapIntensity: 0.5, side: THREE.DoubleSide });
+    }
     if (slot === 'hair' && meta.gen) {
       // generated hair: solid sculpted geometry, strand pattern as tint and relief
       const strands = hairTexture(meta.tex);
@@ -483,7 +488,7 @@ export class Avatar {
       part.culled = cut !== null;
     };
     const hair = this.parts.get('hair'), hat = this.parts.get('hat'), top = this.parts.get('top'), bottom = this.parts.get('bottom');
-    if (hair) cullAbove(hair, hat ? lowest(hat) + 0.012 : null);
+    if (hair) cullAbove(hair, hat && !hat.proxy.meta.noCull ? lowest(hat) + 0.012 : null);
     if (bottom) {
       // the top's hem at the middle of the torso (sleeves excluded): whatever the trousers/skirt have above it lies under the top
       // and would poke through it, so it is dropped. A crop top's hem is higher than the waistband, so nothing is dropped then.

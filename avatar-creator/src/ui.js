@@ -192,7 +192,7 @@ export function buildUI(app) {
         sub('Farbe'), swatches(['#e4e1dc', '#1d1d20', '#6b7280', '#b23b3b', '#2d6fb0', '#3f8f5a', '#d16a9a', '#e3c14a'], () => state.skin.underColor, (c) => { state.skin.underColor = c; app.skinChanged(); })),
     ] },
     { id: 'deco', label: 'Deko', cam: 'upper', build: () => [
-      section('Hüte', 'hair', partGrid('hat', { none: 'Keiner' }), sub('Farbe'), colorRow('hat', CLOTH_COLORS, 'Original')),
+      section('Hüte & Kappen', 'hair', partGrid('hat', { none: 'Keine' }), sub('Farbe'), colorRow('hat', CLOTH_COLORS, 'Original')),
       section('Brille', 'face', partGrid('glasses', { none: 'Keine' })),
       section('Extras', 'upper', partGrid('extra', { none: 'Keine' }), sub('Farbe'), colorRow('extra', CLOTH_COLORS, 'Original')),
       CONFIG.tattoos && section('Tattoos', 'upper', (() => {

@@ -11,6 +11,8 @@ const DEG = 180 / Math.PI;
 // Measured from where the bundled short hairstyles sit on the base head.
 const HAIRLINE = [[0, 10], [12, 10], [22, 5], [32, -4], [42, -14], [52, -23], [62, -30], [70, -31], [79, -12], [88, -5], [98, -9], [107, -32], [116, -50], [130, -54], [150, -57], [180, -58]];
 
+// elevation (deg) of the lower edge of a cap, by azimuth: high over the forehead, lower at the ears and neck
+const CAPEDGE = (aphi) => (aphi < 50 ? lerp(12, 6, ss(0, 50, aphi)) : aphi < 90 ? lerp(6, -2, ss(50, 90, aphi)) : lerp(-2, -12, ss(90, 180, aphi)));
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 function hairlineDeg(aphi) {
@@ -89,7 +91,8 @@ export function scalp(D) {
   // hairline distance evaluated at the refined position: a smooth contour even where the skull mesh is coarse
   const fs = new Float32Array(n);
   for (let i = 0; i < n; i++) { const h = headInfo(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]); fs[i] = Math.min((h.th - hairlineDeg(h.aphi)) / DEG * 0.95, (EAR_CUT - earV[i]) * 6); }
-  return (D._scalp = { s, th, N, fine: { verts, tris: Uint32Array.from(tris), pos, nrm, s: fs } });
+  const fe = new Float32Array(n); for (let i = 0; i < n; i++) fe[i] = (EAR_CUT - earV[i]) * 6;
+  return (D._scalp = { s, th, N, fine: { verts, tris: Uint32Array.from(tris), pos, nrm, s: fs, e: fe } });
 }
 const EAR_CUT = 0.2;
 
@@ -183,6 +186,19 @@ export const HAIR_STYLES = {
     pieces: (m) => { m.ball({ phi: 62, th: 58, r: 0.3, lift: 0.22 }); m.ball({ phi: -62, th: 58, r: 0.3, lift: 0.22 }); } },
   gen_braids: { label: 'Geflochtene Zöpfe', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.085 * (h.th > 20 ? part(h, 0, 0.07) : 1) + 0.02,
     pieces: (m) => { m.tail({ phi: 118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: 1, front: true }); m.tail({ phi: -118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: -1, front: true }); } },
+  // ---- head wear (slot 'hat'): solid shell on the skull, cut along a cap line, plus a brim piece
+  gen_cap: { slot: 'hat', label: 'Baseball-Kappe', defaultColor: '#2d6fb0', ignoreHairline: true, vol: 1, region: (h) => (h.th - CAPEDGE(h.aphi)) * 0.03,
+    thick: (h) => 0.16 + 0.07 * ss(10, 70, h.th), pieces: (m) => m.brim({ phi: 0, span: 62, len: 0.82, droop: 0.2 }) },
+  gen_cap_back: { slot: 'hat', label: 'Kappe verkehrt herum', defaultColor: '#c0392b', ignoreHairline: true, vol: 1, region: (h) => (h.th - CAPEDGE(h.aphi)) * 0.03,
+    thick: (h) => 0.16 + 0.07 * ss(10, 70, h.th), pieces: (m) => m.brim({ phi: 180, span: 62, len: 0.82, droop: 0.2 }) },
+  gen_snapback: { slot: 'hat', label: 'Snapback (flacher Schirm)', defaultColor: '#1d1d20', ignoreHairline: true, vol: 1, region: (h) => (h.th - CAPEDGE(h.aphi)) * 0.03,
+    thick: (h) => 0.17 + 0.1 * ss(25, 62, h.th), pieces: (m) => m.brim({ phi: 0, span: 66, len: 0.95, droop: 0.04 }) },
+  gen_beanie: { slot: 'hat', label: 'Mütze', defaultColor: '#6b7280', ignoreHairline: true, vol: 1,
+    region: (h) => (h.th - (h.aphi < 60 ? lerp(-4, -22, ss(0, 60, h.aphi)) : -30 - 6 * ss(60, 180, h.aphi))) * 0.03,
+    thick: (h) => 0.2 + 0.08 * ss(15, 75, h.th) + 0.07 * ss(0.5, 0, (h.th - (h.aphi < 60 ? -10 : -32)) * 0.03), bumps: [0.012, 22] },
+  gen_headband: { slot: 'hat', label: 'Stirnband', defaultColor: '#e9e6e1', ignoreHairline: true, vol: 1, noCull: true,
+    region: (h) => 0.32 - Math.abs(h.th - 15) * 0.04, thick: () => 0.1 },
+
   // ---- styles from the reference sheets
   gen_caesar: { label: 'Caesar Cut', tex: 'strand', scalp: UNDER, vol: 1.3, thick: (h) => 0.08 + 0.07 * top(h), bumps: [0.02, 12],
     hang: (h) => (h.aphi < 42 ? 0.2 * ss(42, 18, h.aphi) * (0.55 + 0.45 * Math.abs(Math.sin(h.x * 12 + 0.7))) : 0), hangShape: { out: 0.12, curl: -0.03 } },
@@ -220,7 +236,7 @@ export const HAIR_SEX = {
 
 
 export function registerHair(D) {
-  for (const [id, st] of Object.entries(HAIR_STYLES)) D.proxies[id] = { slot: 'hair', label: st.label, sex: HAIR_SEX.m.includes(id) ? 'm' : HAIR_SEX.f.includes(id) ? 'f' : 'u', gen: true, tex: st.tex, scalp: st.scalp, thumb: `thumbs/${id}.webp`, credit: 'Avatar-Studio (eigene Frisur)', tags: [] };
+  for (const [id, st] of Object.entries(HAIR_STYLES)) D.proxies[id] = { slot: st.slot || 'hair', defaultColor: st.defaultColor, noCull: !!st.noCull, label: st.label, sex: HAIR_SEX.m.includes(id) ? 'm' : HAIR_SEX.f.includes(id) ? 'f' : 'u', gen: true, tex: st.tex, scalp: st.scalp, thumb: `thumbs/${id}.webp`, credit: 'Avatar-Studio (eigene Frisur)', tags: [] };
 }
 
 // ---------------------------------------------------------------- generator
@@ -229,7 +245,7 @@ export function buildHair(D, id) {
   const info = (x, y, z, s) => { const h = headInfo(x, y, z); h.s = s; return h; };
   // 1) where the shell exists: hairline, optionally limited by the style's own region
   const nF = fine.verts.length, f = new Float32Array(nF);
-  for (let i = 0; i < nF; i++) f[i] = st.region ? Math.min(fine.s[i], st.region(info(fine.pos[3 * i], fine.pos[3 * i + 1], fine.pos[3 * i + 2], fine.s[i]))) : fine.s[i];
+  for (let i = 0; i < nF; i++) { const base = st.ignoreHairline ? fine.e[i] : fine.s[i]; f[i] = st.region ? Math.min(base, st.region(info(fine.pos[3 * i], fine.pos[3 * i + 1], fine.pos[3 * i + 2], fine.s[i]))) : base; }
   if (st.shell === false) f.fill(-1, 1);              // painted-only style: keep a single hidden vertex so the part stays a valid mesh
   if (!st.bumps && st.tex === 'strand') st = { ...st, bumps: [0.012, 14] };
   const mesh = clipMesh(fine, f), nS = mesh.verts.length;
@@ -246,12 +262,12 @@ export function buildHair(D, id) {
   for (let i = 0; i < nS; i++) {
     const h = hs[i], hangs = st.hang ? st.hang(h) > 0 : false;
     let t = st.thick(h) * (st.vol ?? (st.tex === 'curl' || st.tex === 'buzz' ? 1 : 1.55));
-    if (!hangs) t *= 0.06 + 0.94 * ss(0, 0.3, h.s);                         // lies down toward the hairline
-    if (st.region && st.edge !== 'step') t *= 0.05 + 0.95 * ss(0, 0.4, reg[i]);   // fades out at the style's own edge
+    if (!hangs && st.slot !== 'hat') t *= 0.06 + 0.94 * ss(0, 0.3, h.s);    // hair lies down toward the hairline (head wear keeps its edge)
+    if (st.region && st.edge !== 'step' && st.slot !== 'hat') t *= 0.05 + 0.95 * ss(0, 0.4, reg[i]);   // fades out at the style's own edge
     t = Math.max(t, 0.012);
     const o = st.offset ? st.offset(h) : [0, 0, 0], k = ss(0, 0.35, h.s);
     out[3 * i] = bp[3 * i] + bn[3 * i] * t + o[0] * k; out[3 * i + 1] = bp[3 * i + 1] + bn[3 * i + 1] * t + o[1] * k; out[3 * i + 2] = bp[3 * i + 2] + bn[3 * i + 2] * t + o[2] * k;
-    fixed[i] = h.s < 0.03 && !hangs ? 1 : 0;
+    fixed[i] = h.s < 0.03 && !hangs && st.slot !== 'hat' ? 1 : 0;
   }
   // smooth the sculpted surface
   const nb = Array.from({ length: nS }, () => new Set());
@@ -273,7 +289,7 @@ export function buildHair(D, id) {
   const uvOf = (h, len = 0) => (st.uv === 'back' ? [h.x * 1.5, (0.9 - h.z) * 0.45 + len * 0.3] : st.uv === 'up' ? [h.z * 1.4, h.y * 0.6] : [h.phi / 52, (90 - h.th) / 75 + len * 0.3]);
   const add = (i, x, y, z, u, v, sh = 1) => { const q = mesh.verts[i]; R.push(q.r[0], q.r[1], q.r[2]); B.push(q.w[0], q.w[1], q.w[2]); O.push(x - bp[3 * i], y - bp[3 * i + 1], z - bp[3 * i + 2]); UV.push(u, v); SH.push(sh); return R.length / 3 - 1; };
   // roots are darker: the shell's thin front edge would otherwise catch the light as a pale band across the forehead
-  for (let i = 0; i < nS; i++) { const [u, v] = uvOf(hs[i]); add(i, out[3 * i], out[3 * i + 1], out[3 * i + 2], u, v, 0.42 + 0.58 * ss(0, 0.5, hs[i].s)); }
+  for (let i = 0; i < nS; i++) { const [u, v] = uvOf(hs[i]); add(i, out[3 * i], out[3 * i + 1], out[3 * i + 2], u, v, st.slot === 'hat' ? 1 : 0.42 + 0.58 * ss(0, 0.5, hs[i].s)); }
   I.push(...mesh.tris);
 
   // open edges of the shell, in order
@@ -355,6 +371,18 @@ export function buildHair(D, id) {
         pts.push([x, y, z]); radii.push(r * (braid ? 1 - 0.45 * u : (0.75 + 0.5 * Math.sin(Math.min(1, u * 1.4) * Math.PI)) * (1 - 0.75 * u * u)) + 0.012);
       }
       tube(i, pts, radii, 8, braid);
+    },
+    brim({ phi, span, len, droop }) {
+      // a curved visor along the front (or back) of the cap edge: three rows from the edge outward, dipping toward the middle
+      const N = 16, rows = 3, grid = [];
+      for (let k = 0; k <= N; k++) {
+        const c = Math.abs(k / N - 0.5) * 2, a = phi + (k / N - 0.5) * 2 * span, ap = Math.abs(((a + 540) % 360) - 180) >= 0 ? Math.abs((((a % 360) + 540) % 360) - 180) : 0;
+        const aphi = Math.abs((((a % 360) + 540) % 360) - 180), i = nearest(a, CAPEDGE(aphi)), ar = (a * Math.PI) / 180;
+        const L = len * (1 - 0.78 * Math.pow(c, 2.2)), dx = Math.sin(ar), dz = Math.cos(ar), row = [];
+        for (let r = 0; r <= rows; r++) { const u = r / rows; row.push(add(i, out[3 * i] + dx * L * u, out[3 * i + 1] - droop * u * u + 0.04 * Math.sin(u * Math.PI), out[3 * i + 2] + dz * L * u, k / N * 2, u, 1)); }
+        grid.push(row);
+      }
+      for (let k = 0; k < N; k++) for (let r = 0; r < rows; r++) { const a = grid[k][r], b = grid[k + 1][r], c = grid[k][r + 1], d = grid[k + 1][r + 1]; I.push(a, c, b, b, c, d); }
     },
     locks({ from, every, length, radius, th }) {
       let n = 0;
