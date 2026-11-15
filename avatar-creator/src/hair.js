@@ -141,9 +141,9 @@ export const HAIR_STYLES = {
   gen_fade_crop: { label: 'Fade + Crop', tex: 'strand', scalp: FADE, region: (h) => (h.th - 20) * 0.02, edge: 'taper',
     thick: (h) => 0.13 + 0.12 * top(h) + 0.06 * front(h) * top(h), offset: (h) => [0, 0, 0.1 * front(h) * top(h)],
     hang: (h) => (h.aphi < 52 ? 0.24 * ss(52, 30, h.aphi) : 0), hangShape: { out: 0.25, curl: -0.08 } },
-  gen_fade_quiff: { label: 'Tolle mit Fade', tex: 'strand', uv: 'back', scalp: FADE, region: (h) => (h.th - 20) * 0.02, edge: 'taper', vol: 1,
+  gen_fade_quiff: { clump: false, label: 'Tolle mit Fade', tex: 'strand', uv: 'back', scalp: FADE, region: (h) => (h.th - 20) * 0.02, edge: 'taper', vol: 1,
     thick: (h) => 0.12 + 0.08 * top(h) + 0.42 * ss(90, 20, h.aphi) * ss(22, 60, h.th) * ss(-0.3, 0.7, h.z), offset: (h) => { const k = front(h) * ss(22, 50, h.th); return [0, 0.07 * k, -0.03 * k]; } },
-  gen_undercut: { label: 'Undercut, nach hinten', tex: 'strand', uv: 'back', scalp: STUBBLE, region: (h) => (h.th - 30) * 0.02, edge: 'step',
+  gen_undercut: { clump: false, label: 'Undercut, nach hinten', tex: 'strand', uv: 'back', scalp: STUBBLE, region: (h) => (h.th - 30) * 0.02, edge: 'step',
     thick: (h) => 0.2 + 0.08 * front(h), offset: (h) => [0, 0, -0.06] },
   gen_side_part: { label: 'Seitenscheitel', tex: 'strand', scalp: UNDER,
     thick: (h) => (0.07 + 0.17 * top(h)) * (h.th > 35 ? part(h, 0.36) : 1), offset: (h) => [-0.06 * top(h) * (h.x < 0.36 ? 1 : -0.4), 0, 0.03 * front(h) * top(h)] },
@@ -156,9 +156,9 @@ export const HAIR_STYLES = {
     thick: (h) => 0.5 * ss(0.3, 0.08, Math.abs(h.x)) * (0.55 + 0.45 * ss(-40, 30, h.th)) },
   gen_afro_short: { label: 'Afro kurz', tex: 'curl', scalp: UNDER, vol: 0.85, thick: () => 0.28, bumps: [0.05, 12] },
   gen_afro_big: { label: 'Afro groß', tex: 'curl', scalp: UNDER, thick: (h) => 0.36 + 0.3 * ss(-35, 35, h.th), bumps: [0.07, 9] },
-  gen_cornrows: { label: 'Cornrows', tex: 'rows', uv: 'back', scalp: { strength: 0.55, lo: -90, hi: -89 }, thick: () => 0.05,
+  gen_cornrows: { clump: false, label: 'Cornrows', tex: 'rows', uv: 'back', scalp: { strength: 0.55, lo: -90, hi: -89 }, thick: () => 0.05,
     pieces: (m) => m.locks({ from: 128, every: 3, length: 0.9, radius: 0.045, th: [-60, -10] }) },
-  gen_dreads: { label: 'Dreadlocks', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1.3, thick: () => 0.1,
+  gen_dreads: { clump: false, label: 'Dreadlocks', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1.3, thick: () => 0.1,
     pieces: (m) => m.locks({ from: 0, every: 1, length: 2.3, radius: 0.085, th: [-60, 90] }) },
   gen_man_bun: { label: 'Männer-Dutt', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.1 + 0.03 * top(h), pieces: (m) => m.ball({ phi: 180, th: 56, r: 0.36, lift: 0.22 }) },
   gen_mullet: { label: 'Vokuhila', tex: 'strand', scalp: UNDER, thick: (h) => 0.08 + 0.16 * top(h) + 0.1 * back(h),
@@ -202,10 +202,10 @@ export const HAIR_STYLES = {
   // ---- styles from the reference sheets
   gen_caesar: { label: 'Caesar Cut', tex: 'strand', scalp: UNDER, vol: 1.3, thick: (h) => 0.08 + 0.07 * top(h), bumps: [0.02, 12],
     hang: (h) => (h.aphi < 42 ? 0.2 * ss(42, 18, h.aphi) * (0.55 + 0.45 * Math.abs(Math.sin(h.x * 12 + 0.7))) : 0), hangShape: { out: 0.12, curl: -0.03 } },
-  gen_slick_back: { label: 'Nach hinten', tex: 'strand', uv: 'back', scalp: { strength: 0, lo: -90, hi: -89 }, vol: 1.2, region: (h) => (h.aphi < 60 ? (h.th - 22) * 0.02 : 9), edge: 'taper',
+  gen_slick_back: { clump: false, label: 'Nach hinten', tex: 'strand', uv: 'back', scalp: { strength: 0, lo: -90, hi: -89 }, vol: 1.2, region: (h) => (h.aphi < 60 ? (h.th - 22) * 0.02 : 9), edge: 'taper',
     thick: (h) => 0.1 + 0.07 * top(h) + 0.08 * ss(90, 25, h.aphi) * ss(20, 55, h.th), offset: (h) => { const k = front(h) * ss(15, 50, h.th); return [0, 0.01 * k, -0.2 * k]; },
     hang: (h) => (h.aphi > 112 ? 0.5 * ss(112, 150, h.aphi) : 0), hangShape: { out: 0.15, curl: 0.08 } },
-  gen_quiff: { label: 'Tolle', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1,
+  gen_quiff: { clump: false, label: 'Tolle', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1,
     thick: (h) => 0.12 + 0.1 * top(h) + 0.5 * ss(90, 20, h.aphi) * ss(20, 58, h.th) * ss(-0.3, 0.7, h.z), offset: (h) => { const k = front(h) * ss(20, 50, h.th); return [0, 0.09 * k, -0.02 * k]; } },
   gen_textured_fringe: { label: 'Strukturiert', tex: 'strand', scalp: FADE, region: (h) => (h.th - 8) * 0.02, edge: 'taper', bumps: [0.06, 11], vol: 1.2,
     thick: (h) => 0.16 + 0.12 * top(h) + 0.1 * front(h), offset: (h) => [0, 0.03 * front(h) * top(h), 0.08 * front(h) * top(h)],
@@ -400,6 +400,30 @@ export function buildHair(D, id) {
     },
   };
   if (st.pieces) st.pieces(maker);
+
+  // 7) layered clumps: tapered ribbons that follow the skull from the crown downward and flick out at the tips.
+  // They break up the smooth shell (silhouette, layering) so the hair does not read as a helmet.
+  const cl = st.clump === false || st.slot === 'hat' || (st.tex !== 'strand') ? null : { n: 230, len: 0.95, width: 0.2, from: 24, lift: 0.04, ...(st.clump || {}) };
+  if (cl) {
+    const cand = [];
+    for (let i = 0; i < nS; i++) { const h = hs[i]; if (mesh.verts[i].t === 0 && h.s > 0.2 && h.th >= cl.from && h.th < 82) cand.push(i); }
+    const step = Math.max(1, Math.floor(cand.length / cl.n));
+    for (let ci = 0; ci < cand.length; ci += step) {
+      const i = cand[ci], h = hs[i], K = 7;
+      const r0 = Math.hypot(out[3 * i] - C[0], out[3 * i + 1] - C[1], out[3 * i + 2] - C[2]);
+      const phi0 = (h.phi * Math.PI) / 180, th0 = (h.th * Math.PI) / 180, hr = hash3(i, 3.1, 7.7), L = cl.len * (0.65 + 0.7 * hash3(i, 9, 1));
+      const lim = (hairlineDeg(h.aphi) * Math.PI) / 180 + 0.07, thEnd = Math.max(th0 - L / r0, lim), drift = Math.sign(h.x || 1) * (0.05 + 0.2 * hr);
+      if (th0 - thEnd < 0.12) continue;
+      const w0 = cl.width * (0.7 + 0.6 * hash3(i, 5, 2)), ur = 0.3 + 0.4 * hash3(i, 1, 8), row = [];
+      for (let r = 0; r <= K; r++) {
+        const u = r / K, th = lerp(th0, thEnd, u), phi = phi0 + drift * (th0 - th), rr = r0 + cl.lift + 0.05 * Math.sin(Math.PI * u) + 0.16 * u * u * u;
+        const cx = C[0] + rr * Math.cos(th) * Math.sin(phi), cy = C[1] + rr * Math.sin(th), cz = C[2] + rr * Math.cos(th) * Math.cos(phi);
+        const w = (w0 * (1 - 0.88 * Math.pow(u, 1.15))) / 2, ex = Math.cos(phi), ez = -Math.sin(phi), sh = 0.82 + 0.18 * u;
+        row.push([add(i, cx - ex * w, cy, cz - ez * w, ur - 0.12, u * 0.7, sh), add(i, cx + ex * w, cy, cz + ez * w, ur + 0.12, u * 0.7, sh)]);
+      }
+      for (let r = 0; r < K; r++) { const [a, b] = row[r], [c2, d] = row[r + 1]; I.push(a, c2, b, b, c2, d); }
+    }
+  }
 
   const nP = R.length / 3;
   const p = { id, meta: D.proxies[id], gen: true, nP, nR: nP, ref: Uint16Array.from(R), bary: Float32Array.from(B), off: Float32Array.from(O),
