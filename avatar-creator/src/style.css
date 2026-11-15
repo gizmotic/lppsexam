@@ -110,3 +110,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 
 .tile .ph.skin { background-size: 560%; background-position: 87% 50%; transform: rotate(90deg) scale(1.2); }
 .tile .ph.stroke { background-size: 190%; background-position: 8% 50%; background-color: #f1e3d6; }
+
+.chips.inline { display: inline-flex; margin: 2px 0 10px; box-shadow: none; background: var(--paper2); }
+.chips.inline .chip.on { background: var(--ink); color: #fff; }
+.grid[data-filter=m] .tile[data-sex=f], .grid[data-filter=f] .tile[data-sex=m] { display: none; }

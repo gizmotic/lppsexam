@@ -75,7 +75,7 @@ export function buildUI(app) {
     const mark = () => { const cur = get(); btns.forEach(([b, id]) => b.classList.toggle('on', id === cur)); };
     if (none) { const b = h('button', { class: 'tile none', onclick: () => { set(null); mark(); } }, h('span', { class: 'ph' }, '∅'), h('span', { class: 'cap' }, none)); btns.push([b, null]); wrap.append(b); }
     for (const it of items) {
-      const b = h('button', { class: 'tile', title: it.title || it.label, onclick: () => { set(it.id); mark(); } },
+      const b = h('button', { class: 'tile', 'data-sex': it.sex, title: it.title || it.label, onclick: () => { set(it.id); mark(); } },
         it.thumb ? h('img', { src: it.thumb, alt: '', loading: 'lazy' }) : h('span', { class: 'ph ' + (it.cls || ''), style: it.style || {} }, it.glyph || ''),
         h('span', { class: 'cap' }, it.label));
       btns.push([b, it.id]); wrap.append(b);
@@ -98,7 +98,7 @@ export function buildUI(app) {
   // brows and lashes: the stroke texture itself reads better than the tiny bundled preview
   const partItems = (slot) => Object.entries(D.proxies).filter(([id, p]) => p.slot === slot && !CONFIG.hiddenParts.includes(id)).map(([id, p]) => (slot === 'brows' || slot === 'lashes'
     ? { id, label: p.label, cls: 'stroke', style: { backgroundImage: `url(${url(p.map)})` }, title: `${p.label} — ${p.credit}` }
-    : { id, label: p.label, thumb: p.thumb ? url(p.thumb) : null, title: `${p.label} — ${p.credit}` }));
+    : { id, label: p.label, sex: p.sex, thumb: p.thumb ? url(p.thumb) : null, title: `${p.label} — ${p.credit}` }));
   const partGrid = (slot, opts = {}) => grid(partItems(slot), () => state.parts[slot], (id) => {
     state.parts[slot] = id;
     if ((slot === 'top' || slot === 'bottom') && id) state.parts.full = null;
@@ -178,10 +178,11 @@ export function buildUI(app) {
         sub('Lidschatten'), swatches(SHADOW_COLORS, () => state.skin.shadowColor, (c) => { state.skin.shadowColor = c; if (!state.skin.shadow) state.skin.shadow = 0.5; app.skinChanged(); syncers.forEach((f) => f()); }), skinSlider('Stärke', 'shadow')),
       section('Bartschatten', 'face', skinSlider('Stoppeln', 'beard'), note('Farbe folgt der Haarfarbe.')),
     ] },
-    { id: 'hair', label: 'Haare', cam: 'hair', build: () => [
-      sub('Frisur'), partGrid('hair', { none: 'Glatze' }),
-      sub('Haarfarbe'), colorRow('hair', HAIR_COLORS),
-    ] },
+    { id: 'hair', label: 'Haare', cam: 'hair', build: () => {
+      const g = partGrid('hair', { none: 'Glatze' });
+      const chips = [['', 'Alle'], ['m', 'Männlich'], ['f', 'Weiblich']].map(([k, label]) => h('button', { class: 'chip' + (k === '' ? ' on' : ''), onclick: (e) => { g.dataset.filter = k; chips.forEach((c) => c.classList.toggle('on', c === e.currentTarget)); } }, label));
+      return [sub('Frisur'), h('div', { class: 'chips inline' }, ...chips), g, sub('Haarfarbe'), colorRow('hair', HAIR_COLORS)];
+    } },
     { id: 'clothes', label: 'Kleidung', cam: 'full', build: () => [
       section('Oberteile', 'upper', partGrid('top', CONFIG.schoolSafe ? {} : { none: 'Keines' }), sub('Farbe'), colorRow('top', CLOTH_COLORS, 'Original')),
       section('Hosen & Röcke', 'lower', partGrid('bottom', CONFIG.schoolSafe ? {} : { none: 'Keine' }), sub('Farbe'), colorRow('bottom', CLOTH_COLORS, 'Original')),

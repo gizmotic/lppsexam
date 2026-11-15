@@ -9,7 +9,7 @@ const C = [0, 7.5, 0.5];                  // skull centre in base-mesh units (de
 const DEG = 180 / Math.PI;
 // hairline: elevation (deg, seen from the skull centre) below which there is no hair, by azimuth (0 = front, 180 = back).
 // Measured from where the bundled short hairstyles sit on the base head.
-const HAIRLINE = [[0, 27], [12, 27], [22, 22], [32, 10], [42, -6], [52, -15], [62, -27], [70, -31], [79, -12], [88, -5], [98, -9], [107, -32], [116, -50], [130, -54], [150, -57], [180, -58]];
+const HAIRLINE = [[0, 14], [12, 14], [22, 10], [32, 1], [42, -11], [52, -19], [62, -28], [70, -31], [79, -12], [88, -5], [98, -9], [107, -32], [116, -50], [130, -54], [150, -57], [180, -58]];
 
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -138,8 +138,8 @@ export const HAIR_STYLES = {
   gen_fade_crop: { label: 'Fade + Crop', tex: 'strand', scalp: FADE, region: (h) => (h.th - 20) * 0.02, edge: 'taper',
     thick: (h) => 0.13 + 0.12 * top(h) + 0.06 * front(h) * top(h), offset: (h) => [0, 0, 0.1 * front(h) * top(h)],
     hang: (h) => (h.aphi < 52 ? 0.24 * ss(52, 30, h.aphi) : 0), hangShape: { out: 0.25, curl: -0.08 } },
-  gen_fade_quiff: { label: 'Fade + Tolle', tex: 'strand', uv: 'back', scalp: FADE, region: (h) => (h.th - 20) * 0.02, edge: 'taper',
-    thick: (h) => 0.13 + 0.1 * top(h) + 0.36 * ss(95, 20, h.aphi) * ss(24, 62, h.th) * ss(-0.3, 0.7, h.z), offset: (h) => { const k = front(h) * ss(22, 50, h.th); return [0, 0.03 * k, -0.07 * k]; } },
+  gen_fade_quiff: { label: 'Tolle mit Fade', tex: 'strand', uv: 'back', scalp: FADE, region: (h) => (h.th - 20) * 0.02, edge: 'taper',
+    thick: (h) => 0.13 + 0.1 * top(h) + 0.27 * ss(95, 20, h.aphi) * ss(24, 62, h.th) * ss(-0.3, 0.7, h.z), offset: (h) => { const k = front(h) * ss(22, 50, h.th); return [0, 0.02 * k, -0.07 * k]; } },
   gen_undercut: { label: 'Undercut, nach hinten', tex: 'strand', uv: 'back', scalp: STUBBLE, region: (h) => (h.th - 30) * 0.02, edge: 'step',
     thick: (h) => 0.2 + 0.08 * front(h), offset: (h) => [0, 0, -0.06] },
   gen_side_part: { label: 'Seitenscheitel', tex: 'strand', scalp: UNDER,
@@ -148,32 +148,31 @@ export const HAIR_STYLES = {
     thick: (h) => (0.09 + 0.14 * top(h)) * (h.th > 30 && h.z > -0.5 ? part(h, 0, 0.09) : 1),
     hang: (h) => (h.aphi < 70 ? 0.5 * ss(6, 24, h.aphi) * ss(72, 50, h.aphi) : 0), hangShape: { out: 0.6, curl: 0.12 } },
   gen_fluffy: { label: 'Locken oben + Fade', tex: 'curl', scalp: FADE, region: (h) => (h.th - 16) * 0.02, edge: 'taper',
-    thick: (h) => 0.12 + 0.34 * top(h) + 0.12 * front(h) * top(h), offset: (h) => [0, 0, 0.14 * front(h) * top(h)], bumps: [0.11, 7.5] },
+    thick: (h) => 0.12 + 0.24 * top(h) + 0.08 * front(h) * top(h), offset: (h) => [0, 0, 0.1 * front(h) * top(h)], bumps: [0.1, 7.5] },
   gen_mohawk: { label: 'Iro', tex: 'strand', uv: 'up', scalp: STUBBLE, region: (h) => 0.3 - Math.abs(h.x), edge: 'taper',
-    thick: (h) => 0.72 * ss(0.3, 0.08, Math.abs(h.x)) * (0.55 + 0.45 * ss(-40, 30, h.th)) },
+    thick: (h) => 0.5 * ss(0.3, 0.08, Math.abs(h.x)) * (0.55 + 0.45 * ss(-40, 30, h.th)) },
   gen_afro_short: { label: 'Afro kurz', tex: 'curl', scalp: UNDER, thick: () => 0.3, bumps: [0.05, 12] },
-  gen_afro_big: { label: 'Afro groß', tex: 'curl', scalp: UNDER, thick: (h) => 0.45 + 0.5 * ss(-35, 35, h.th), bumps: [0.07, 9] },
+  gen_afro_big: { label: 'Afro groß', tex: 'curl', scalp: UNDER, thick: (h) => 0.36 + 0.3 * ss(-35, 35, h.th), bumps: [0.07, 9] },
   gen_cornrows: { label: 'Cornrows', tex: 'rows', uv: 'back', scalp: { strength: 0.55, lo: -90, hi: -89 }, thick: () => 0.05,
     pieces: (m) => m.locks({ from: 128, every: 3, length: 0.9, radius: 0.045, th: [-60, -10] }) },
   gen_dreads: { label: 'Dreadlocks', tex: 'rows', uv: 'back', scalp: UNDER, thick: () => 0.1,
     pieces: (m) => m.locks({ from: 0, every: 2, length: 2.1, radius: 0.07, th: [-60, 90] }) },
-  gen_man_bun: { label: 'Man Bun + Undercut', tex: 'strand', uv: 'back', scalp: STUBBLE, region: (h) => (h.th - 26) * 0.02, edge: 'step',
-    thick: () => 0.1, pieces: (m) => m.ball({ phi: 180, th: 52, r: 0.34, lift: 0.22 }) },
+  gen_man_bun: { label: 'Männer-Dutt', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.1 + 0.03 * top(h), pieces: (m) => m.ball({ phi: 180, th: 56, r: 0.36, lift: 0.22 }) },
   gen_mullet: { label: 'Vokuhila', tex: 'strand', scalp: UNDER, thick: (h) => 0.08 + 0.16 * top(h) + 0.1 * back(h),
     hang: (h) => (h.aphi > 118 ? 1.25 * ss(118, 150, h.aphi) : h.aphi < 50 ? 0.22 * ss(50, 30, h.aphi) : 0), hangShape: { out: 0.3, curl: 0.12 } },
   gen_long: { label: 'Lang, Mittelscheitel', tex: 'strand', scalp: UNDER, thick: (h) => 0.13 * (h.th > 30 && h.z > -0.6 ? part(h, 0, 0.08) : 1) + 0.04,
     hang: (h) => (h.aphi > 40 ? lerp(1.45, 3.3, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.3, curl: -0.05, behind: true } },
   gen_long_fringe: { label: 'Lang mit Pony', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 + 0.03 * top(h),
     hang: (h) => (h.aphi > 46 ? lerp(1.45, 3.0, ss(100, 150, h.aphi)) : 0.3 + 0.1 * ss(20, 46, h.aphi)), hangShape: { out: 0.28, curl: -0.06, behind: true } },
-  gen_bob: { label: 'Bob', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 * (h.th > 30 && h.z > -0.6 ? part(h, 0.3, 0.08) : 1) + 0.05,
+  gen_bob: { label: 'Bob-Schnitt', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 * (h.th > 30 && h.z > -0.6 ? part(h, 0.3, 0.08) : 1) + 0.05,
     hang: (h) => (h.aphi > 36 ? lerp(1.05, 0.75, ss(100, 160, h.aphi)) * ss(36, 55, h.aphi) : 0), hangShape: { out: 0.45, curl: -0.3 } },
   gen_long_curly: { label: 'Lange Locken', tex: 'curl', scalp: UNDER, thick: (h) => 0.22 + 0.12 * top(h), bumps: [0.07, 9],
     hang: (h) => (h.aphi > 38 ? lerp(1.4, 2.5, ss(100, 150, h.aphi)) * ss(38, 56, h.aphi) : 0), hangShape: { out: 0.7, curl: 0.15, wave: [0.11, 5.5], behind: true } },
   gen_surfer: { label: 'Halblang, wellig', tex: 'strand', scalp: UNDER, thick: (h) => 0.14 + 0.08 * top(h),
     hang: (h) => (h.aphi > 52 ? lerp(0.95, 1.25, ss(100, 150, h.aphi)) * ss(52, 70, h.aphi) : h.aphi < 40 ? 0.2 * ss(40, 20, h.aphi) : 0), hangShape: { out: 0.5, curl: 0.2, wave: [0.07, 6] } },
-  gen_pixie: { label: 'Pixie', tex: 'strand', scalp: UNDER, thick: (h) => 0.07 + 0.14 * top(h), offset: (h) => [0.05 * top(h), 0, 0.05 * front(h) * top(h)],
+  gen_pixie: { label: 'Pixie-Schnitt', tex: 'strand', scalp: UNDER, thick: (h) => 0.07 + 0.14 * top(h), offset: (h) => [0.05 * top(h), 0, 0.05 * front(h) * top(h)],
     hang: (h) => (h.aphi < 62 ? 0.36 * ss(62, 40, h.aphi) * (h.x < 0.2 ? 1 : 0.45) : 0), hangShape: { out: 0.3, curl: -0.1 } },
-  gen_high_pony: { label: 'Hoher Pferdeschwanz', tex: 'strand', uv: 'back', scalp: UNDER, thick: () => 0.075,
+  gen_high_pony: { label: 'Pferdeschwanz', tex: 'strand', uv: 'back', scalp: UNDER, thick: () => 0.075,
     pieces: (m) => m.tail({ phi: 180, th: 48, length: 2.6, r: 0.2, up: 0.5, back: 0.55 }) },
   gen_low_pony: { label: 'Tiefer Pferdeschwanz', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.08 * (h.th > 25 ? part(h, 0, 0.07) : 1) + 0.02,
     pieces: (m) => m.tail({ phi: 180, th: -36, length: 2.3, r: 0.17, up: 0, back: 0.22 }) },
@@ -182,12 +181,44 @@ export const HAIR_STYLES = {
   gen_bun: { label: 'Dutt', tex: 'strand', uv: 'back', scalp: UNDER, thick: () => 0.085, pieces: (m) => m.ball({ phi: 180, th: 68, r: 0.42, lift: 0.3 }) },
   gen_space_buns: { label: 'Space Buns', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.08 * (h.th > 30 ? part(h, 0, 0.07) : 1) + 0.02,
     pieces: (m) => { m.ball({ phi: 62, th: 58, r: 0.3, lift: 0.22 }); m.ball({ phi: -62, th: 58, r: 0.3, lift: 0.22 }); } },
-  gen_braids: { label: 'Zwei Zöpfe', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.085 * (h.th > 20 ? part(h, 0, 0.07) : 1) + 0.02,
-    pieces: (m) => { m.tail({ phi: 122, th: -22, length: 2.7, r: 0.15, up: 0, back: 0.1, braid: true, side: 1 }); m.tail({ phi: -122, th: -22, length: 2.7, r: 0.15, up: 0, back: 0.1, braid: true, side: -1 }); } },
+  gen_braids: { label: 'Geflochtene Zöpfe', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.085 * (h.th > 20 ? part(h, 0, 0.07) : 1) + 0.02,
+    pieces: (m) => { m.tail({ phi: 118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: 1, front: true }); m.tail({ phi: -118, th: -20, length: 2.9, r: 0.15, up: 0, back: 0.05, braid: true, side: -1, front: true }); } },
+  // ---- styles from the reference sheets
+  gen_caesar: { label: 'Caesar Cut', tex: 'strand', scalp: UNDER, thick: (h) => 0.06 + 0.07 * top(h),
+    hang: (h) => (h.aphi < 46 ? 0.2 * ss(46, 24, h.aphi) : 0), hangShape: { out: 0.12, curl: -0.04 } },
+  gen_slick_back: { label: 'Nach hinten', tex: 'strand', uv: 'back', scalp: UNDER,
+    thick: (h) => 0.12 + 0.08 * top(h) + 0.12 * ss(90, 20, h.aphi) * ss(20, 55, h.th), offset: (h) => { const k = front(h) * ss(15, 50, h.th); return [0, 0.03 * k, -0.1 * k]; },
+    hang: (h) => (h.aphi > 115 ? 0.3 * ss(115, 150, h.aphi) : 0), hangShape: { out: 0.1, curl: 0.05 } },
+  gen_quiff: { label: 'Tolle', tex: 'strand', uv: 'back', scalp: UNDER,
+    thick: (h) => 0.1 + 0.08 * top(h) + 0.28 * ss(90, 20, h.aphi) * ss(22, 60, h.th) * ss(-0.3, 0.7, h.z), offset: (h) => { const k = front(h) * ss(22, 50, h.th); return [0, 0.03 * k, -0.06 * k]; } },
+  gen_textured_fringe: { label: 'Strukturiert', tex: 'strand', scalp: FADE, region: (h) => (h.th - 8) * 0.02, edge: 'taper', bumps: [0.02, 10],
+    thick: (h) => 0.14 + 0.1 * top(h) + 0.08 * front(h), hang: (h) => (h.aphi < 48 ? 0.3 * ss(48, 22, h.aphi) * (0.7 + 0.3 * Math.sin(h.x * 14)) : 0), hangShape: { out: 0.22, curl: -0.08 } },
+  gen_shoulder: { label: 'Schulterlang', tex: 'strand', scalp: UNDER, thick: (h) => (0.12 + 0.07 * top(h)) * (h.th > 30 && h.z > -0.6 ? part(h, 0.2, 0.09) : 1) + 0.03,
+    hang: (h) => (h.aphi > 38 ? lerp(1.3, 1.65, ss(100, 150, h.aphi)) * ss(38, 56, h.aphi) : 0.14 * ss(38, 20, h.aphi)), hangShape: { out: 0.45, curl: 0.1, wave: [0.05, 5], behind: true } },
+  gen_curly_mid: { label: 'Wellig & lockig', tex: 'curl', scalp: UNDER, thick: (h) => 0.24 + 0.1 * top(h), bumps: [0.07, 9],
+    hang: (h) => (h.aphi > 40 ? lerp(0.85, 1.1, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.6, curl: 0.12, wave: [0.1, 6] } },
+  gen_long_bob: { label: 'Langer Bob', tex: 'strand', scalp: UNDER, thick: (h) => 0.15 * (h.th > 30 && h.z > -0.6 ? part(h, 0.3, 0.08) : 1) + 0.05,
+    hang: (h) => (h.aphi > 34 ? lerp(1.5, 1.15, ss(100, 160, h.aphi)) * ss(34, 52, h.aphi) : 0), hangShape: { out: 0.35, curl: -0.15 } },
+  gen_long_wavy: { label: 'Langes welliges Haar', tex: 'strand', scalp: UNDER, thick: (h) => 0.13 * (h.th > 30 && h.z > -0.6 ? part(h, 0, 0.08) : 1) + 0.05,
+    hang: (h) => (h.aphi > 40 ? lerp(1.6, 3.3, ss(100, 150, h.aphi)) * ss(40, 58, h.aphi) : 0), hangShape: { out: 0.55, curl: 0.05, wave: [0.1, 5.5], behind: true } },
+  gen_messy_bun: { label: 'Unordentlicher Dutt', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.1 + 0.06 * top(h), bumps: [0.03, 10],
+    hang: (h) => (h.aphi > 26 && h.aphi < 80 && h.th < 42 ? 0.42 * ss(26, 38, h.aphi) * ss(80, 62, h.aphi) * (0.5 + 0.5 * Math.sin(h.phi * 0.7 + h.y * 5)) : 0), hangShape: { out: 0.3, curl: 0.2, wave: [0.1, 6] },
+    pieces: (m) => m.ball({ phi: 180, th: 66, r: 0.5, lift: 0.3 }) },
+  gen_shaggy: { label: 'Zotteliges Haar', tex: 'strand', scalp: UNDER, thick: (h) => 0.19 + 0.1 * top(h), bumps: [0.04, 7],
+    hang: (h) => (h.aphi > 34 ? lerp(1.4, 2.3, ss(100, 150, h.aphi)) * (0.8 + 0.25 * Math.sin(h.phi * 0.5 + h.y * 3)) * ss(34, 52, h.aphi) : 0.35 * ss(34, 16, h.aphi) * (0.7 + 0.3 * Math.sin(h.x * 11))), hangShape: { out: 0.55, curl: 0.1, wave: [0.12, 7], behind: true } },
+  gen_curly_bob: { label: 'Kurzes lockiges Haar', tex: 'curl', scalp: UNDER, thick: (h) => 0.3 + 0.1 * top(h), bumps: [0.08, 9],
+    hang: (h) => (h.aphi > 34 ? lerp(0.95, 0.8, ss(100, 160, h.aphi)) * ss(34, 52, h.aphi) : 0), hangShape: { out: 0.75, curl: 0.1, wave: [0.1, 6] } },
 };
 
+// sex tag for the hair tab filter: m / f; everything else is shown for both
+export const HAIR_SEX = {
+  m: ['gen_short', 'gen_buzz', 'gen_caesar', 'gen_fade_crop', 'gen_fade_quiff', 'gen_undercut', 'gen_slick_back', 'gen_quiff', 'gen_textured_fringe', 'gen_side_part', 'gen_curtains', 'gen_fluffy', 'gen_mohawk', 'gen_man_bun', 'gen_mullet', 'gen_shoulder', 'gen_curly_mid', 'gen_afro_short'],
+  f: ['gen_long', 'gen_long_fringe', 'gen_bob', 'gen_long_bob', 'gen_long_wavy', 'gen_long_curly', 'gen_shaggy', 'gen_curly_bob', 'gen_pixie', 'gen_high_pony', 'gen_low_pony', 'gen_pigtails', 'gen_bun', 'gen_messy_bun', 'gen_space_buns', 'gen_braids'],
+};
+
+
 export function registerHair(D) {
-  for (const [id, st] of Object.entries(HAIR_STYLES)) D.proxies[id] = { slot: 'hair', label: st.label, gen: true, tex: st.tex, scalp: st.scalp, thumb: `thumbs/${id}.webp`, credit: 'Avatar-Studio (eigene Frisur)', tags: [] };
+  for (const [id, st] of Object.entries(HAIR_STYLES)) D.proxies[id] = { slot: 'hair', label: st.label, sex: HAIR_SEX.m.includes(id) ? 'm' : HAIR_SEX.f.includes(id) ? 'f' : 'u', gen: true, tex: st.tex, scalp: st.scalp, thumb: `thumbs/${id}.webp`, credit: 'Avatar-Studio (eigene Frisur)', tags: [] };
 }
 
 // ---------------------------------------------------------------- generator
@@ -304,12 +335,13 @@ export function buildHair(D, id) {
         row.push(add(i, c[0] + Math.sin(a) * Math.cos(b) * rr, c[1] + Math.cos(a) * rr * 0.92, c[2] + Math.sin(a) * Math.sin(b) * rr, (x / seg) * 3, y / rows)); } ring.push(row); }
       for (let y = 0; y < rows; y++) for (let x = 0; x < seg; x++) { const a = ring[y][x], b = ring[y][(x + 1) % seg], c2 = ring[y + 1][x], d = ring[y + 1][(x + 1) % seg]; I.push(a, b, c2, b, d, c2); }
     },
-    tail({ phi, th, length, r, up, back: bk, braid, side = 0 }) {
+    tail({ phi, th, length, r, up, back: bk, braid, side = 0, front = false }) {
       const i = nearest(phi, th), n = 12, pts = [], radii = [], s0 = [out[3 * i], out[3 * i + 1], out[3 * i + 2]];
       for (let k = 0; k <= n; k++) {
         const u = k / n, rise = up * Math.sin(Math.min(1, u * 2.2) * Math.PI) * 0.5, y = s0[1] + rise - length * u * u * (up ? 1 : 0.5) - (up ? 0 : length * u * 0.5);
         let z = s0[2] - bk * Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5) - 0.1 * u, x = s0[0] + side * 0.05 * u;
-        if (y < 6.2 && Math.abs(side) <= 1) { const k2 = ss(6.2, 5.2, y); z = Math.min(z, lerp(z, -1.05 - 0.25 * ss(5.9, 4.6, y), k2)); if (side) x = lerp(x, side * 0.42, k2); }
+        if (front) { const k2 = ss(6.5, 5.5, y); x = lerp(x, side * 0.78, k2); z = lerp(z, 1.0 - 0.12 * ss(5.4, 3.9, y), k2); }
+        else if (y < 6.2 && Math.abs(side) <= 1) { const k2 = ss(6.2, 5.2, y); z = Math.min(z, lerp(z, -1.05 - 0.25 * ss(5.9, 4.6, y), k2)); if (side) x = lerp(x, side * 0.42, k2); }
         if (Math.abs(side) > 1) x = s0[0] + Math.sign(side) * (0.28 * Math.sin(Math.min(1, u * 1.5) * Math.PI * 0.5) + 0.05 * u);
         pts.push([x, y, z]); radii.push(r * (braid ? 1 - 0.45 * u : (0.75 + 0.5 * Math.sin(Math.min(1, u * 1.4) * Math.PI)) * (1 - 0.75 * u * u)) + 0.012);
       }
@@ -364,6 +396,6 @@ export function hairTexture(kind) {
 
 // which styles the "random" button and the presets draw from
 export const HAIR_SETS = {
-  male: ['gen_short', 'gen_buzz', 'gen_fade_crop', 'gen_fade_quiff', 'gen_undercut', 'gen_side_part', 'gen_curtains', 'gen_fluffy', 'gen_mohawk', 'gen_afro_short', 'gen_afro_big', 'gen_cornrows', 'gen_dreads', 'gen_man_bun', 'gen_mullet', 'gen_surfer'],
-  female: ['gen_long', 'gen_long_fringe', 'gen_bob', 'gen_long_curly', 'gen_surfer', 'gen_pixie', 'gen_high_pony', 'gen_low_pony', 'gen_pigtails', 'gen_bun', 'gen_space_buns', 'gen_braids', 'gen_curtains', 'gen_afro_big', 'gen_dreads', 'gen_cornrows'],
+  male: ['gen_short', 'gen_buzz', 'gen_caesar', 'gen_fade_crop', 'gen_fade_quiff', 'gen_undercut', 'gen_slick_back', 'gen_quiff', 'gen_textured_fringe', 'gen_side_part', 'gen_curtains', 'gen_fluffy', 'gen_mohawk', 'gen_afro_short', 'gen_cornrows', 'gen_dreads', 'gen_man_bun', 'gen_mullet', 'gen_surfer', 'gen_shoulder', 'gen_curly_mid'],
+  female: ['gen_long', 'gen_long_fringe', 'gen_bob', 'gen_long_bob', 'gen_long_wavy', 'gen_long_curly', 'gen_shaggy', 'gen_curly_bob', 'gen_surfer', 'gen_pixie', 'gen_high_pony', 'gen_low_pony', 'gen_pigtails', 'gen_bun', 'gen_messy_bun', 'gen_space_buns', 'gen_braids', 'gen_curtains', 'gen_afro_big', 'gen_dreads', 'gen_cornrows'],
 };
