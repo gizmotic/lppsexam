@@ -71,7 +71,8 @@ const app = {
   panelWidth: 0, placing: null, listeners: new Set(),
   // ---- change notifications from the UI
   shapeChanged() { avatar.dirty.shape = true; app.save(); },
-  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top), hipsCovered: !!(state.parts.full || state.parts.bottom), scalp: D.proxies[state.parts.hair]?.scalp || null }); app.save(); },
+  // hair under a cap is covered: no painted scalp
+  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top), hipsCovered: !!(state.parts.full || state.parts.bottom), scalp: (state.parts.hat && !D.proxies[state.parts.hat]?.noCull) ? null : (D.proxies[state.parts.hair]?.scalp || null) }); app.save(); },
   colorsChanged() { avatar.applyColors(); app.skinChanged(); },
   async partsChanged() { await avatar.syncParts(); avatar.update(); animator.rebuild(); app.skinChanged(); },
   setAnim(id) { state.anim = id; animator.play(id); app.save(); },
