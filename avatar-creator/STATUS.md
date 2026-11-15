@@ -24,7 +24,8 @@ siehe unten. Offen ist Qualität an Haaren und Nahaufnahme, kein fehlendes Kerns
 | 1 | nein | Haare ausgefranst, Hut/Mantel kollidieren, Haut-Overlays fleckig, weißer Streifen am Hosenbund, Vorschaubilder uneinheitlich |
 | 2 | nein | Vorschaubilder behoben, Hosenbund behoben; Haare, Nahaufnahme, Hut/Mantel, gealterte Haut nur teilweise |
 | 3 | nein | Hut sitzt, Fedora erkennbar, Ansichts-Knöpfe ok; Haaransatz weiter stufig, Bartschatten/Alterung „wie Schmutz“, Mantel-Flecken, Zufallsgesichter „teilweise verschieden“ (Mund fast gleich) |
-| danach | nicht erneut geprüft | Mund/Kinn/Nase streuen im Zufall jetzt breiter, Standardfrisur ohne Pony über dem Auge, Bartschatten weicher |
+| danach | nicht erneut geprüft (inzwischen: 27 erzeugte Frisuren, Kleidung Pflicht, Rock/Hose unter dem Saum abgeschnitten, eigene Kopftextur) |
+| — | — | Mund/Kinn/Nase streuen im Zufall jetzt breiter, Standardfrisur ohne Pony über dem Auge, Bartschatten weicher |
 
 ## Nicht gemessen / nicht geprüft
 - **60 fps auf echter Grafikkarte**: nicht gemessen. Hier lief nur Software-Rendering.
