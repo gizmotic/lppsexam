@@ -9,7 +9,7 @@ const C = [0, 7.5, 0.5];                  // skull centre in base-mesh units (de
 const DEG = 180 / Math.PI;
 // hairline: elevation (deg, seen from the skull centre) below which there is no hair, by azimuth (0 = front, 180 = back).
 // Measured from where the bundled short hairstyles sit on the base head.
-const HAIRLINE = [[0, 5], [12, 5], [22, 1], [32, -7], [42, -16], [52, -23], [62, -30], [70, -31], [79, -12], [88, -5], [98, -9], [107, -32], [116, -50], [130, -54], [150, -57], [180, -58]];
+const HAIRLINE = [[0, 10], [12, 10], [22, 5], [32, -4], [42, -14], [52, -23], [62, -30], [70, -31], [79, -12], [88, -5], [98, -9], [107, -32], [116, -50], [130, -54], [150, -57], [180, -58]];
 
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -173,7 +173,7 @@ export const HAIR_STYLES = {
   gen_pixie: { label: 'Pixie-Schnitt', tex: 'strand', scalp: UNDER, vol: 1.4, bumps: [0.03, 11], thick: (h) => 0.08 + 0.12 * top(h), offset: (h) => [0.06 * top(h), 0.03 * top(h), 0.06 * front(h) * top(h)],
     hang: (h) => (h.aphi < 60 ? (0.3 + 0.12 * Math.sin(h.x * 9)) * ss(60, 36, h.aphi) * (h.x < 0.2 ? 1 : 0.5) : 0), hangShape: { out: 0.3, curl: -0.1 } },
   gen_high_pony: { label: 'Pferdeschwanz', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1.3, thick: () => 0.075,
-    pieces: (m) => m.tail({ phi: 180, th: 40, length: 3.2, r: 0.22, up: 0.4, back: 0.5, side: 1, front: true }) },
+    pieces: (m) => m.tail({ phi: 180, th: 40, length: 3.8, r: 0.3, up: 0.4, back: 0.5, side: 1, front: true }) },
   gen_low_pony: { label: 'Tiefer Pferdeschwanz', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.08 * (h.th > 25 ? part(h, 0, 0.07) : 1) + 0.02,
     pieces: (m) => m.tail({ phi: 180, th: -36, length: 2.3, r: 0.17, up: 0, back: 0.22 }) },
   gen_pigtails: { label: 'Zwei Pferdeschwänze', tex: 'strand', uv: 'back', scalp: UNDER, thick: (h) => 0.08 * (h.th > 25 ? part(h, 0, 0.07) : 1) + 0.02,
@@ -186,7 +186,7 @@ export const HAIR_STYLES = {
   // ---- styles from the reference sheets
   gen_caesar: { label: 'Caesar Cut', tex: 'strand', scalp: UNDER, vol: 1.3, thick: (h) => 0.08 + 0.07 * top(h), bumps: [0.02, 12],
     hang: (h) => (h.aphi < 42 ? 0.2 * ss(42, 18, h.aphi) * (0.55 + 0.45 * Math.abs(Math.sin(h.x * 12 + 0.7))) : 0), hangShape: { out: 0.12, curl: -0.03 } },
-  gen_slick_back: { label: 'Nach hinten', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1.2, region: (h) => (h.aphi < 60 ? (h.th - 20) * 0.02 : 9), edge: 'taper',
+  gen_slick_back: { label: 'Nach hinten', tex: 'strand', uv: 'back', scalp: { strength: 0, lo: -90, hi: -89 }, vol: 1.2, region: (h) => (h.aphi < 60 ? (h.th - 22) * 0.02 : 9), edge: 'taper',
     thick: (h) => 0.1 + 0.07 * top(h) + 0.08 * ss(90, 25, h.aphi) * ss(20, 55, h.th), offset: (h) => { const k = front(h) * ss(15, 50, h.th); return [0, 0.01 * k, -0.2 * k]; },
     hang: (h) => (h.aphi > 112 ? 0.5 * ss(112, 150, h.aphi) : 0), hangShape: { out: 0.15, curl: 0.08 } },
   gen_quiff: { label: 'Tolle', tex: 'strand', uv: 'back', scalp: UNDER, vol: 1,
