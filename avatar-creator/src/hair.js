@@ -289,7 +289,7 @@ export function buildHair(D, id) {
   const uvOf = (h, len = 0) => (st.uv === 'back' ? [h.x * 1.5, (0.9 - h.z) * 0.45 + len * 0.3] : st.uv === 'up' ? [h.z * 1.4, h.y * 0.6] : [h.phi / 52, (90 - h.th) / 75 + len * 0.3]);
   const add = (i, x, y, z, u, v, sh = 1) => { const q = mesh.verts[i]; R.push(q.r[0], q.r[1], q.r[2]); B.push(q.w[0], q.w[1], q.w[2]); O.push(x - bp[3 * i], y - bp[3 * i + 1], z - bp[3 * i + 2]); UV.push(u, v); SH.push(sh); return R.length / 3 - 1; };
   // roots are darker: the shell's thin front edge would otherwise catch the light as a pale band across the forehead
-  for (let i = 0; i < nS; i++) { const [u, v] = uvOf(hs[i]); add(i, out[3 * i], out[3 * i + 1], out[3 * i + 2], u, v, st.slot === 'hat' ? 1 : 0.42 + 0.58 * ss(0, 0.5, hs[i].s)); }
+  for (let i = 0; i < nS; i++) { const [u, v] = uvOf(hs[i]); add(i, out[3 * i], out[3 * i + 1], out[3 * i + 2], u, v, st.slot === 'hat' ? 1 : 0.72 + 0.28 * ss(0, 0.5, hs[i].s)); }
   I.push(...mesh.tris);
 
   // open edges of the shell, in order
@@ -403,7 +403,7 @@ export function buildHair(D, id) {
 
   // 7) layered clumps: tapered ribbons that follow the skull from the crown downward and flick out at the tips.
   // They break up the smooth shell (silhouette, layering) so the hair does not read as a helmet.
-  const cl = st.clump === false || st.slot === 'hat' || (st.tex !== 'strand') ? null : { n: 230, len: 0.95, width: 0.2, from: 24, lift: 0.04, ...(st.clump || {}) };
+  const cl = st.clump === false || st.slot === 'hat' || (st.tex !== 'strand') ? null : { n: 200, len: 0.9, width: 0.27, from: 24, lift: 0.04, ...(st.clump || {}) };
   if (cl) {
     const cand = [];
     for (let i = 0; i < nS; i++) { const h = hs[i]; if (mesh.verts[i].t === 0 && h.s > 0.2 && h.th >= cl.from && h.th < 82) cand.push(i); }
@@ -416,9 +416,9 @@ export function buildHair(D, id) {
       if (th0 - thEnd < 0.12) continue;
       const w0 = cl.width * (0.7 + 0.6 * hash3(i, 5, 2)), ur = 0.3 + 0.4 * hash3(i, 1, 8), row = [];
       for (let r = 0; r <= K; r++) {
-        const u = r / K, th = lerp(th0, thEnd, u), phi = phi0 + drift * (th0 - th), rr = r0 + cl.lift + 0.05 * Math.sin(Math.PI * u) + 0.16 * u * u * u;
+        const u = r / K, th = lerp(th0, thEnd, u), phi = phi0 + drift * (th0 - th), rr = r0 + cl.lift + 0.04 * Math.sin(Math.PI * u) + 0.06 * u * u * u;
         const cx = C[0] + rr * Math.cos(th) * Math.sin(phi), cy = C[1] + rr * Math.sin(th), cz = C[2] + rr * Math.cos(th) * Math.cos(phi);
-        const w = (w0 * (1 - 0.88 * Math.pow(u, 1.15))) / 2, ex = Math.cos(phi), ez = -Math.sin(phi), sh = 0.82 + 0.18 * u;
+        const w = (w0 * (1 - 0.72 * Math.pow(u, 1.3))) / 2, ex = Math.cos(phi), ez = -Math.sin(phi), sh = 0.82 + 0.18 * u;
         row.push([add(i, cx - ex * w, cy, cz - ez * w, ur - 0.12, u * 0.7, sh), add(i, cx + ex * w, cy, cz + ez * w, ur + 0.12, u * 0.7, sh)]);
       }
       for (let r = 0; r < K; r++) { const [a, b] = row[r], [c2, d] = row[r + 1]; I.push(a, c2, b, b, c2, d); }
@@ -440,7 +440,7 @@ export function hairTexture(kind) {
   g.fillStyle = '#b4b4b4'; g.fillRect(0, 0, S, S);
   if (kind === 'strand') {
     // clumps of different width and brightness instead of a uniform comb pattern
-    for (let i = 0; i < 70; i++) { const x = rnd() * S, w = 5 + rnd() * 22, l = Math.round(120 + rnd() * 110); g.fillStyle = `rgba(${l},${l},${l},${0.18 + rnd() * 0.3})`; for (const dx of [-S, 0, S]) g.fillRect(x + dx, 0, w, S); }
+    for (let i = 0; i < 70; i++) { const x = rnd() * S, w = 5 + rnd() * 22, l = Math.round(150 + rnd() * 70); g.fillStyle = `rgba(${l},${l},${l},${0.08 + rnd() * 0.16})`; for (const dx of [-S, 0, S]) g.fillRect(x + dx, 0, w, S); }
     for (let i = 0; i < 380; i++) { const x = rnd() * S, w = 0.6 + rnd() * 1.8, l = Math.round(60 + rnd() * 190); g.strokeStyle = `rgba(${l},${l},${l},${0.15 + rnd() * 0.3})`; g.lineWidth = w;
       g.beginPath(); let px = x; g.moveTo(px, 0); for (let y = 64; y <= S; y += 64) { px += (rnd() - 0.5) * 16; g.lineTo(px, y); } g.stroke(); }
   } else if (kind === 'curl') {
