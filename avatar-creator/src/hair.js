@@ -12,7 +12,7 @@ const DEG = 180 / Math.PI;
 const HAIRLINE = [[0, 10], [12, 10], [22, 5], [32, -4], [42, -14], [52, -23], [62, -30], [70, -31], [79, -12], [88, -5], [98, -9], [107, -32], [116, -50], [130, -54], [150, -57], [180, -58]];
 
 // elevation (deg) of the lower edge of a cap, by azimuth: high over the forehead, lower at the ears and neck
-const CAPEDGE = (aphi) => (aphi < 50 ? lerp(12, 6, ss(0, 50, aphi)) : aphi < 90 ? lerp(6, -2, ss(50, 90, aphi)) : lerp(-2, -12, ss(90, 180, aphi)));
+export const CAPEDGE = (aphi) => (aphi < 50 ? lerp(12, 6, ss(0, 50, aphi)) : aphi < 90 ? lerp(6, -2, ss(50, 90, aphi)) : lerp(-2, -12, ss(90, 180, aphi)));
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 function hairlineDeg(aphi) {
@@ -379,7 +379,7 @@ export function buildHair(D, id) {
         const c = Math.abs(k / N - 0.5) * 2, a = phi + (k / N - 0.5) * 2 * span, ap = Math.abs(((a + 540) % 360) - 180) >= 0 ? Math.abs((((a % 360) + 540) % 360) - 180) : 0;
         const aphi = Math.abs((((a % 360) + 540) % 360) - 180), i = nearest(a, CAPEDGE(aphi)), ar = (a * Math.PI) / 180;
         const L = len * (1 - 0.78 * Math.pow(c, 2.2)), dx = Math.sin(ar), dz = Math.cos(ar), row = [];
-        for (let r = 0; r <= rows; r++) { const u = r / rows; row.push(add(i, out[3 * i] + dx * L * u, out[3 * i + 1] - droop * (1 + 1.6 * c * c) * u * u + 0.04 * Math.sin(u * Math.PI) * (1 - c), out[3 * i + 2] + dz * L * u, k / N * 2, u, 1)); }
+        for (let r = 0; r <= rows; r++) { const u = r / rows; row.push(add(i, out[3 * i] + dx * L * u, out[3 * i + 1] - droop * (1 + 0.7 * c * c) * u * u + 0.04 * Math.sin(u * Math.PI) * (1 - c), out[3 * i + 2] + dz * L * u, k / N * 2, u, 1)); }
         grid.push(row);
       }
       for (let k = 0; k < N; k++) for (let r = 0; r < rows; r++) { const a = grid[k][r], b = grid[k + 1][r], c = grid[k][r + 1], d = grid[k + 1][r + 1]; I.push(a, c, b, b, c, d); }

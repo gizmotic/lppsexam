@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { targetWeights } from './modifiers.js';
 import { CONFIG } from './config.js';
 import { spread, loadImage } from './data.js';
-import { hairTexture } from './hair.js';
+import { hairTexture, CAPEDGE } from './hair.js';
 
 export const EXPRESSIONS = {
   blinkL: [['eye-left-closure', 1]],
@@ -474,6 +474,28 @@ export class Avatar {
     }
     // garment-on-garment: a hat hides the hair inside its crown, a long coat or tunic hides what it covers of the trousers/skirt
     const lowest = (part) => { const a = part.mesh.geometry.attributes.position.array; let m = Infinity; for (let i = 1; i < a.length; i += 3) if (a[i] < m) m = a[i]; return m; };
+    // hair under head wear: a triangle goes when all its corners lie above the cap's lower edge (which is high at the front and sides, low at the neck)
+    const hc = rest.slice(3 * D.bones.findIndex((b) => b.name === 'head'), 3 * D.bones.findIndex((b) => b.name === 'head') + 3);
+    const CX = 0, CY = hc[1] + 0.053, CZ = hc[2] + 0.034;
+    const underCap = (A, i) => {
+      const dx = A[3 * i] - CX, dy = A[3 * i + 1] - CY, dz = A[3 * i + 2] - CZ, r = Math.hypot(dx, dy, dz) || 1;
+      const th = Math.asin(Math.max(-1, Math.min(1, dy / r))) * 57.2958, aphi = Math.abs(Math.atan2(dx, dz)) * 57.2958;
+      return th > CAPEDGE(aphi) - 2;
+    };
+    const cullCap = (part, cap) => {
+      const src = part.proxy.idx; let idx = src;
+      if (cap) {
+        const A = part.mesh.geometry.attributes.position.array, out = new Uint32Array(src.length); let n = 0;
+        for (let i = 0; i < src.length; i += 3) {
+          if (underCap(A, src[i]) && underCap(A, src[i + 1]) && underCap(A, src[i + 2])) continue;
+          out[n++] = src[i]; out[n++] = src[i + 1]; out[n++] = src[i + 2];
+        }
+        idx = out.subarray(0, n);
+      }
+      if (part.culled || cap) part.mesh.geometry.setIndex(new THREE.BufferAttribute(idx, 1));
+      part.culled = !!cap;
+    };
+    // trousers/skirt under a top: drop what lies above the top's hem
     const cullAbove = (part, cut) => {
       const src = part.proxy.idx; let idx = src;
       if (cut !== null) {
@@ -488,7 +510,7 @@ export class Avatar {
       part.culled = cut !== null;
     };
     const hair = this.parts.get('hair'), hat = this.parts.get('hat'), top = this.parts.get('top'), bottom = this.parts.get('bottom');
-    if (hair) cullAbove(hair, hat && !hat.proxy.meta.noCull ? lowest(hat) - 0.06 : null);   // the cap is thicker than the hair: what it covers is dropped, no pale gap at its edge
+    if (hair) cullCap(hair, !!(hat && !hat.proxy.meta.noCull));   // the cap is thicker than the hair: what it covers is dropped
     if (bottom) {
       // the top's hem at the middle of the torso (sleeves excluded): whatever the trousers/skirt have above it lies under the top
       // and would poke through it, so it is dropped. A crop top's hem is higher than the waistband, so nothing is dropped then.
