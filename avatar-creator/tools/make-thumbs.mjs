@@ -12,7 +12,7 @@ const page = await browser.newPage({ viewport: { width: 800, height: 1136 }, dev
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.goto((process.env.URL || 'http://localhost:5199/') + '?fresh');
 await page.waitForFunction('window.__ready === true', null, { timeout: 90000 });
-await page.addStyleTag({ content: '#panel,#toolbar,#toast{display:none!important} #app{background:#ece6de!important}' });
+await page.addStyleTag({ content: '#panel,#toolbar,#toast{display:none!important} #app{background:#bfb8ae!important}' });
 await page.evaluate('__app.panelWidth = 0; __app.resize(); __app.scene.children.filter(o => o.isMesh && o.material.isShadowMaterial).forEach(o => o.visible = false);');
 const items = await page.evaluate((slots) => Object.entries(__app.D.proxies).filter(([, p]) => slots.includes(p.slot)).map(([id, p]) => ({ id, slot: p.slot, tags: p.tags })), Object.keys(FRAME));
 for (const it of items) {

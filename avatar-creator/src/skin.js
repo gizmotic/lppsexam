@@ -6,7 +6,8 @@ import { url } from './data.js';
 
 export const MAX_MOLES = 24, MAX_TATTOOS = 8;
 export const TATTOO_GLYPHS = ['★', '♥', '☾', '⚓', '☀', '♪', '∞', '✿', '⚡', '☯', '♠', '✦', '❖', '➳', '☘', '♛'];
-export const SKIN_TONES = ['#f7e0d3', '#f2d0bb', '#eabf9f', '#deab88', '#cd946e', '#b57d57', '#986342', '#7a4c31', '#5a3623', '#402619'];
+// albedo tones (what the skin reflects before lighting): kept soft, the studio light adds the warmth
+export const SKIN_TONES = ['#f4e1d6', '#edd1bf', '#e2bda6', '#d3a88c', '#bf9175', '#a5795d', '#896049', '#6d4a39', '#53382c', '#3c2921'];
 
 const VERT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 
@@ -50,13 +51,17 @@ void main(){
   float relief = clamp(dot(older, vec3(0.3, 0.59, 0.11)) / max(dot(c, vec3(0.3, 0.59, 0.11)), 0.05), 0.5, 1.3);
   c = mix(c, mix(c * relief, older, 0.25), uAgeMix);
   c *= uToneMul;
+  c = mix(vec3(dot(c, vec3(0.3, 0.59, 0.11))), c, 0.9);   // the sources are a touch oversaturated for a lit scene
   // fine detail the 512px source cannot carry: pores and faint mottling
   float pores = vnoise(vUv * 1500.0) * 0.6 + vnoise(vUv * 3100.0) * 0.4;
-  c *= 1.0 + (pores - 0.5) * 0.07;
+  c *= 1.0 + (pores - 0.5) * 0.035;
   c.gb *= 1.0 - (vnoise(vUv * 55.0) - 0.5) * 0.035;
 
   // blush
   c *= mix(vec3(1.0), mix(vec3(1.0), uBlushColor / max(lum(uBlushColor), 0.2) * 0.94, 0.55), clamp(mA.g * uBlush * 0.7, 0.0, 1.0));
+  // lash line: the source skin has a saturated orange lid rim; settle it into a soft neutral shadow
+  float rim = smoothstep(0.35, 0.9, mA.b);
+  c = mix(c, vec3(lum(c)) * vec3(0.80, 0.70, 0.68), rim * 0.55);
   // eye shadow
   float lid = smoothstep(0.12, 0.55, mA.b) * uShadow;
   c = mix(c, uShadowColor * (0.55 + 0.6 * lum(c)), lid * 0.85);
@@ -73,7 +78,7 @@ void main(){
   // beard shadow + stubble
   float bm = smoothstep(0.15, 0.6, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
   float stub = max(spots(vUv, 3400.0, 0.9, 3.0), spots(vUv, 2300.0, 0.7, 9.0));
-  c = mix(c, c * (uHairColor * 0.75 + 0.2), bm * (0.3 + 0.6 * stub));
+  c = mix(c, c * (uHairColor * 0.6 + 0.12), bm * (0.22 + 0.78 * stub));
 
   // moles
   for (int i = 0; i < ${MAX_MOLES}; i++) {

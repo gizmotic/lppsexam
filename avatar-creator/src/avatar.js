@@ -159,8 +159,8 @@ export class Avatar {
   }
 
   // ------------------------------------------------------------ textures
-  texture(file, { gray = false, srgb = true } = {}) {
-    const key = file + (gray ? '|g' : '');
+  texture(file, { gray = false, srgb = true, cleanEdge = false } = {}) {
+    const key = file + (gray ? '|g' : '') + (cleanEdge ? '|c' : '');
     let t = this.texCache.get(key);
     if (t) return t;
     if (!gray) {
@@ -191,6 +191,18 @@ export class Avatar {
           l = 255 * Math.pow(l / 255, gamma) * gain;
           l = Math.max(0, Math.min(255, 160 + (l - 160) * 1.45));   // more strand contrast
           d[i] = d[i + 1] = d[i + 2] = l;
+        }
+        if (cleanEdge) {
+          // blur the coverage, then re-harden it: strand-level tatters become one smooth, deliberate contour
+          const a = new Float32Array(W * H), b = new Float32Array(W * H), R = 5;
+          for (let i = 0; i < a.length; i++) a[i] = d[4 * i + 3] / 255;
+          for (let pass = 0; pass < 2; pass++) {
+            for (let y = 0; y < H; y++) { let acc = 0; const row = y * W;
+              for (let x = -R; x < W; x++) { if (x + R < W) acc += a[row + x + R]; if (x - R - 1 >= 0) acc -= a[row + x - R - 1]; if (x >= 0) b[row + x] = acc / (2 * R + 1); } }
+            for (let x = 0; x < W; x++) { let acc = 0;
+              for (let y = -R; y < H; y++) { if (y + R < H) acc += b[(y + R) * W + x]; if (y - R - 1 >= 0) acc -= b[(y - R - 1) * W + x]; if (y >= 0) a[y * W + x] = acc / (2 * R + 1); } }
+          }
+          for (let i = 0; i < a.length; i++) { const k = Math.min(1, Math.max(0, (a[i] - 0.3) / 0.3)); d[4 * i + 3] = 255 * k * k * (3 - 2 * k); }
         }
         ctx.putImageData(id, 0, 0); t.image = canvas; t.needsUpdate = true;
       };
@@ -237,7 +249,7 @@ export class Avatar {
     }
     if (slot === 'hair') {
       // opaque core; the soft strand tips are drawn by a second, blended pass (see _softHair)
-      const strands = this.texture(meta.map, { gray: true });
+      const strands = this.texture(meta.map, { gray: true, cleanEdge: CONFIG.hairCleanEdge });
       return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: 1.6, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.62, envMapIntensity: 0.5, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide });
     }
     if (slot === 'brows' || slot === 'lashes') {
@@ -248,7 +260,7 @@ export class Avatar {
     }
     if (slot === 'teeth' || slot === 'tongue') return new THREE.MeshStandardMaterial({ map: this.texture(meta.map), roughness: 0.35 });
     const m = new THREE.MeshStandardMaterial({
-      map: this.texture(meta.map, { gray: !!color }), color: new THREE.Color(color || '#ffffff'),
+      map: this.texture(meta.map, { gray: !!color }), color: new THREE.Color(color || '#e9e9e9'),   // untinted cloth sits just under white so it keeps its shading
       roughness: slot === 'shoes' ? 0.6 : 0.85, side: THREE.DoubleSide, alphaTest: 0.5,
     });
     if (meta.normal) { m.normalMap = this.texture(meta.normal, { srgb: false }); m.normalScale.set(0.8, 0.8); }
@@ -326,7 +338,7 @@ export class Avatar {
       if (mesh.morphTargetInfluences && this.body.morphTargetInfluences) this.body.morphTargetInfluences.forEach((v, i) => { mesh.morphTargetInfluences[i] = v; });
       this.root.add(mesh);
       const part = { id, mesh, proxy, P: new Float32Array(proxy.nP * 3) };
-      if (slot === 'hair') {
+      if (slot === 'hair' && CONFIG.hairSoftPass) {
         part.soft = this._skinned(g, this._softHair(mesh.material), 'Part_hair_soft');
         part.soft.castShadow = false; part.soft.receiveShadow = false; part.soft.renderOrder = 1; part.soft.userData.noExport = true;
         this.root.add(part.soft);
@@ -411,6 +423,11 @@ export class Avatar {
         if ((slot === 'hair' || slot === 'hat') && y > maxY) maxY = y;
       }
       computeNormals(P, p.nP, p.idx, p.vmap, gn.array, this._tmp);
+      if (slot === 'top' || slot === 'bottom' || slot === 'full') {
+        // a little air between cloth and body, more on heavy builds where the body would otherwise poke through
+        const air = 0.003 + 0.014 * Math.max(0, this.state.macro.weight - 0.5) + 0.006 * Math.max(0, this.state.macro.muscle - 0.5), A = gp.array, N = gn.array;
+        for (let i = 0; i < A.length; i++) A[i] += N[i] * air;
+      }
       if (slot === 'hair') {
         // hair is many overlapping cards: lean the normals toward a head-centred shell so it shades as one volume
         const hi = D.bones.findIndex((b) => b.name === 'head') * 3;

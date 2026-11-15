@@ -26,7 +26,7 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
 scene.environmentIntensity = 0.75;
 
 // one studio for every view: warm key with shadows, cool rim, environment as fill
-const key = new THREE.DirectionalLight(0xfff1e2, 2.4);
+const key = new THREE.DirectionalLight(0xfff7ef, 2.4);
 key.position.set(1.6, 3.4, 3.2); key.castShadow = CONFIG.shadows;
 key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.012; key.shadow.radius = 5;
 Object.assign(key.shadow.camera, { left: -1.4, right: 1.4, top: 2.3, bottom: -0.3, near: 0.5, far: 9 });
@@ -97,18 +97,20 @@ const app = {
     }[name] || null;
     if (!F) return;
     const [cy, cz, size, az, el] = F;
-    const aspectFit = Math.min(1, (app.viewW() / innerHeight) / 0.62);
+    const aspectFit = Math.min(1, (app.viewW() / (canvas.clientHeight || innerHeight)) / 0.62);
     const dist = (size / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / aspectFit;
     const target = new THREE.Vector3(0, cy, cz);
     const pos = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(dist).add(target);
     app.currentFrame = name;
+    document.querySelectorAll('#views .chip').forEach((b) => b.classList.toggle('on', b.dataset.view === name));
     if (instant) { camera.position.copy(pos); controls.target.copy(target); app._tween = null; return; }
     app._tween = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: target };
   },
   viewW() { return Math.max(200, innerWidth - app.panelWidth); },
   resize() {
-    renderer.setSize(innerWidth, innerHeight, false);
-    camera.aspect = innerWidth / innerHeight;
+    const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;   // on phones the canvas is only the top part
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
     // keep the avatar centred in the area right of the panel
     if (app.panelWidth && innerWidth > 760) camera.setViewOffset(innerWidth, innerHeight, -app.panelWidth / 2, 0, innerWidth, innerHeight); else camera.clearViewOffset();
     camera.updateProjectionMatrix();

@@ -95,7 +95,7 @@ export function buildUI(app) {
   });
   const group = (id) => GROUPS.find((g) => g.id === id);
   // brows and lashes: the stroke texture itself reads better than the tiny bundled preview
-  const partItems = (slot) => Object.entries(D.proxies).filter(([, p]) => p.slot === slot).map(([id, p]) => (slot === 'brows' || slot === 'lashes'
+  const partItems = (slot) => Object.entries(D.proxies).filter(([id, p]) => p.slot === slot && !CONFIG.hiddenParts.includes(id)).map(([id, p]) => (slot === 'brows' || slot === 'lashes'
     ? { id, label: p.label, cls: 'stroke', style: { backgroundImage: `url(${url(p.map)})` }, title: `${p.label} — ${p.credit}` }
     : { id, label: p.label, thumb: p.thumb ? url(p.thumb) : null, title: `${p.label} — ${p.credit}` }));
   const partGrid = (slot, opts = {}) => grid(partItems(slot), () => state.parts[slot], (id) => {
@@ -240,7 +240,7 @@ export function buildUI(app) {
     const s = DEFAULT_STATE();
     if (kind === 'f') {
       Object.assign(s.macro, { gender: 0.0, cup: 0.5 });
-      Object.assign(s.parts, { hair: 'long01', brows: 'eyebrow006', top: 'female_casualsuit01_top', bottom: 'female_casualsuit01_bottom', shoes: 'shoes06' });
+      Object.assign(s.parts, { hair: 'ponytail01', brows: 'eyebrow002', top: 'vnecktop', bottom: 'tightjeans', shoes: 'shoes05' });
       Object.assign(s.skin, { base: 'young_lightskinned_female', lipStrength: 0.3, blush: 0.15 });
       s.colors.hair = '#4a3323';
     } else {
@@ -251,22 +251,49 @@ export function buildUI(app) {
   }
   function randomize() {
     const s = DEFAULT_STATE(), R = Math.random, pick = (a) => a[Math.floor(R() * a.length)];
+    const gauss = () => (R() + R() + R() - 1.5) / 1.5;                 // roughly normal, -1..1
     const female = R() < 0.5;
-    Object.assign(s.macro, { gender: female ? R() * 0.25 : 0.75 + R() * 0.25, age: R() < 0.7 ? R() * 0.3 : R(), muscle: 0.3 + R() * 0.5, weight: 0.3 + R() * 0.5, height: 0.3 + R() * 0.4, cup: 0.3 + R() * 0.5 });
-    const e = [R(), R() * 0.6, R() * 0.6]; Object.assign(s.macro, { caucasian: e[0], african: e[1], asian: e[2] });
-    for (const g of GROUPS) if (['head', 'eyes', 'nose', 'mouth', 'cheek', 'chin', 'forehead'].includes(g.id)) for (const sl of g.sliders) { if (R() < 0.45) { const single = !sl[2]; s.mods[sliderKey(sl)] = single ? R() * 0.4 : (R() - 0.5) * 1.1; } }
-    const ids = (slot, tag) => Object.entries(D.proxies).filter(([, p]) => p.slot === slot).map(([id]) => id);
-    const sexSkins = D.skins.filter((k) => k.sex === (female ? 'female' : 'male') && k.age !== 'old');
-    s.skin.base = pick(sexSkins).id; s.skin.tone = R() < 0.5 ? null : pick(SKIN_TONES);
-    s.skin.wrinkles = s.macro.age > 0.5 ? s.macro.age : 0; s.skin.freckles = R() < 0.3 ? R() : 0;
-    if (female) { s.skin.lipStrength = R() * 0.6; s.skin.blush = R() * 0.4; } else s.skin.beard = R() < 0.4 ? R() * 0.8 : 0;
-    s.parts.hair = pick(ids('hair')); s.parts.brows = pick(ids('brows')); s.colors.hair = pick(HAIR_COLORS.slice(0, 10)); s.colors.brows = s.colors.hair;
-    s.eyes.color = pick(EYE_COLORS);
+    const age = R() < 0.6 ? R() * 0.25 : R() < 0.6 ? 0.25 + R() * 0.35 : 0.6 + R() * 0.4;
+    Object.assign(s.macro, { gender: female ? R() * 0.3 : 0.7 + R() * 0.3, age, muscle: 0.25 + R() * 0.6, weight: 0.2 + R() * 0.65, height: 0.25 + R() * 0.5, cup: 0.25 + R() * 0.55, proportions: 0.3 + R() * 0.5 });
+    // one dominant build type with a varying share of the others
+    const e = [R() * 0.5, R() * 0.5, R() * 0.5]; e[Math.floor(R() * 3)] += 0.6 + R();
+    Object.assign(s.macro, { caucasian: e[0], african: e[1], asian: e[2] });
+    // every face slider gets its own draw: most move a little, a few move a lot -> faces differ in many small ways
+    for (const g of GROUPS) {
+      if (!['head', 'forehead', 'eyes', 'brows', 'nose', 'mouth', 'cheek', 'chin', 'ears', 'neck'].includes(g.id)) continue;
+      for (const sl of g.sliders) {
+        if (!sl[2] && !sl[3]) continue;
+        const strong = R() < 0.18;
+        const v = gauss() * (strong ? 0.95 : 0.42);
+        if (Math.abs(v) > 0.05) s.mods[sliderKey(sl)] = Math.max(-1, Math.min(1, v));
+      }
+    }
+    // one head-shape type, sometimes blended with a second
+    const shapes = group('head').sliders.filter((sl) => !sl[2] && !sl[3]);
+    s.mods[sliderKey(pick(shapes))] = 0.35 + R() * 0.55;
+    if (R() < 0.35) s.mods[sliderKey(pick(shapes))] = 0.2 + R() * 0.4;
+    const ids = (slot) => Object.entries(D.proxies).filter(([id, p]) => p.slot === slot && !CONFIG.hiddenParts.includes(id)).map(([id]) => id);
+    const ageTag = age > 0.62 ? 'old' : age > 0.3 ? 'middleage' : 'young';
+    const skins = D.skins.filter((k) => k.sex === (female ? 'female' : 'male') && k.age === ageTag);
+    const darkish = s.macro.african > Math.max(s.macro.caucasian, s.macro.asian);
+    s.skin.base = pick(skins.filter((k) => (k.tone === 'darkskinned') === darkish).length ? skins.filter((k) => (k.tone === 'darkskinned') === darkish) : skins).id;
+    s.skin.tone = R() < 0.55 ? null : pick(darkish ? SKIN_TONES.slice(5) : SKIN_TONES.slice(0, 6));
+    s.skin.wrinkles = age > 0.3 ? Math.min(1, (age - 0.3) * 1.5) : 0;
+    s.skin.freckles = R() < 0.25 ? 0.3 + R() * 0.7 : 0; s.skin.freckleSeed = 1 + Math.floor(R() * 97);
+    if (female) { s.skin.lipStrength = R() < 0.6 ? R() * 0.7 : 0; s.skin.lipColor = pick(LIP_COLORS); s.skin.blush = R() * 0.3; s.skin.shadow = R() < 0.3 ? R() * 0.6 : 0; s.skin.shadowColor = pick(SHADOW_COLORS); }
+    else s.skin.beard = R() < 0.45 ? 0.3 + R() * 0.7 : 0;
+    // hair: the two fringes that cover an eye come up less often
+    const hairs = ids('hair').flatMap((h) => (/^bob/.test(h) ? [h] : [h, h, h]));
+    s.parts.hair = !female && R() < 0.12 ? null : pick(hairs.filter((h) => female || !/long|pony|braid|bob/.test(h)).length ? hairs.filter((h) => female || R() < 0.15 || !/long|pony|braid|bob/.test(h)) : hairs);
+    s.parts.brows = pick(ids('brows')); s.parts.lashes = pick(ids('lashes'));
+    s.colors.hair = age > 0.7 && R() < 0.7 ? pick(['#8d8d8d', '#b9b9b9', '#e9e9e9']) : pick(darkish ? HAIR_COLORS.slice(0, 3) : HAIR_COLORS.slice(0, 9));
+    s.colors.brows = /^#(8d|b9|e9)/.test(s.colors.hair) ? '#6a6a6a' : s.colors.hair;
+    s.eyes.color = pick(darkish ? EYE_COLORS.slice(0, 3) : EYE_COLORS);
     const tops = ids('top').filter((i) => female || i.startsWith('male')), bottoms = ids('bottom').filter((i) => female || i.startsWith('male'));
     s.parts.top = pick(tops); s.parts.bottom = pick(bottoms); s.parts.shoes = pick(ids('shoes')); s.parts.full = female && R() < 0.25 ? pick(ids('full').filter((i) => !i.startsWith('male'))) : null;
-    s.parts.glasses = R() < 0.2 ? 'glasses' : null;
+    s.parts.glasses = R() < 0.18 ? 'glasses' : null;
     s.anim = state.anim;
-    app.setState(s);
+    return app.setState(s);
   }
 
   // ------------------------------------------------------------------ assemble
@@ -291,10 +318,14 @@ export function buildUI(app) {
   const toolbar = document.getElementById('toolbar');
   const views = [['full', 'Ganz'], ['upper', 'Oberkörper'], ['face', 'Gesicht']];
   toolbar.append(
-    h('div', { class: 'chips' }, ...views.map(([id, label]) => h('button', { class: 'chip', onclick: () => app.frame(id) }, label))),
+    h('div', { class: 'chips', id: 'views' }, ...views.map(([id, label]) => h('button', { class: 'chip', 'data-view': id, onclick: () => app.frame(id) }, label))),
     h('div', { class: 'chips' },
       h('button', { class: 'chip', onclick: randomize, id: 'btn-random' }, 'Zufall'),
-      h('button', { class: 'chip', onclick: () => { if (confirm('Avatar wirklich zurücksetzen?')) app.setState({ ...DEFAULT_STATE(), anim: state.anim }); } }, 'Zurücksetzen'),
+      (() => { let armed = 0; const b = h('button', { class: 'chip' }, 'Zurücksetzen');
+        b.addEventListener('click', () => {   // second click within 3 s confirms (no browser dialog: those are blocked in embedded views)
+          if (Date.now() - armed < 3000) { armed = 0; b.textContent = 'Zurücksetzen'; app.setState({ ...DEFAULT_STATE(), anim: state.anim }); return; }
+          armed = Date.now(); b.textContent = 'Wirklich? Nochmal klicken'; setTimeout(() => { if (armed) { armed = 0; b.textContent = 'Zurücksetzen'; } }, 3000);
+        }); return b; })(),
       h('button', { class: 'chip primary', onclick: () => open('export') }, 'Exportieren')));
 
   app.panelWidth = innerWidth > 760 ? panel.getBoundingClientRect().width : 0;

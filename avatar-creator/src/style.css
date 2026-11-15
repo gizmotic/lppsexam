@@ -84,6 +84,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 .chip { border: 0; background: none; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink); }
 .chip:hover { background: #ebe5dc; }
 .chip.primary { background: var(--accent); color: var(--accent-ink); }
+.chip.on { background: var(--ink); color: #fff; }
 
 #loading { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; background: #efeae3; font-size: 14px; color: var(--ink2); transition: opacity .4s; z-index: 5; }
 #loading.hidden { opacity: 0; pointer-events: none; }
@@ -94,12 +95,16 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 
 @media (max-width: 760px) {
   #panel { left: 0; right: 0; top: auto; bottom: 0; width: auto; height: 46%; border-radius: 18px 18px 0 0; flex-direction: column; }
-  .rail { width: auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); padding: 6px; }
+  .rail { width: auto; flex: 0 0 auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); padding: 6px; overflow-x: auto; overflow-y: hidden; }
+  .panel-main { min-height: 0; }
+  #toolbar .chips:first-child { display: none; }
+  #toolbar { justify-content: flex-end; }
   .rail button { min-width: 62px; }
   .panel-main header { display: none; }
-  #toolbar { left: 10px; right: 10px; top: 10px; }
+  #toolbar { left: 8px; right: 8px; top: 8px; gap: 6px; }
+  .chip { padding: 7px 10px; font-size: 12px; }
   #toast { left: 50%; bottom: 48%; }
-  #view { height: 58%; }
+  #view { height: 54%; }
 }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } #toast, #loading { transition: none; } }
 

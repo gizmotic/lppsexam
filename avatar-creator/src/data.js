@@ -3,8 +3,11 @@ const BASE = import.meta.env.BASE_URL + 'assets/';
 
 export const url = (p) => BASE + p;
 
+// Some static hosts refuse ".bin"; a build with VITE_BIN_EXT=wasm (see tools/build-page.mjs) serves the same bytes under another extension.
+const BIN_EXT = import.meta.env.VITE_BIN_EXT || 'bin';
+
 async function bin(p) {
-  const r = await fetch(url(p));
+  const r = await fetch(url(p.replace(/\.bin$/, '.' + BIN_EXT)));
   if (!r.ok) throw new Error('asset missing: ' + p);
   return r.arrayBuffer();
 }
