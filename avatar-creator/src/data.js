@@ -60,6 +60,12 @@ async function loadProxy(D, id) {
     del: new Uint16Array(buf, m.del, m.nDel),
     scale: m.scale,
   };
+  // Mirror-packed items have no mhclo scale lines: follow the body with the spread (std-dev per axis)
+  // of all referenced base verts instead, which a single outlying vertex cannot skew.
+  if (id !== 'eyes') {
+    p.refSet = Uint16Array.from(new Set(p.ref));
+    p.baseSpread = spread(D.pos, p.refSet);
+  }
   // skin weights: blend the base weights of the three reference verts, keep the top four
   const si = new Uint16Array(m.nR * 4), sw = new Float32Array(m.nR * 4);
   const pi = new Uint16Array(m.nP * 4), pw = new Float32Array(m.nP * 4);
@@ -85,4 +91,12 @@ async function loadProxy(D, id) {
   }
   p.skinIdx = si; p.skinW = sw;
   return p;
+}
+
+export function spread(V, set) {
+  const m = [0, 0, 0], s = [0, 0, 0], n = set.length;
+  for (let i = 0; i < n; i++) { const v = set[i] * 3; m[0] += V[v]; m[1] += V[v + 1]; m[2] += V[v + 2]; }
+  m[0] /= n; m[1] /= n; m[2] /= n;
+  for (let i = 0; i < n; i++) { const v = set[i] * 3; s[0] += (V[v] - m[0]) ** 2; s[1] += (V[v + 1] - m[1]) ** 2; s[2] += (V[v + 2] - m[2]) ** 2; }
+  return s.map((x) => Math.sqrt(x / n) || 1e-4);
 }

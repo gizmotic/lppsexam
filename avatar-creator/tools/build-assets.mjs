@@ -59,27 +59,34 @@ function buildRender(faces, uvSrc) {
 }
 
 // MakeHuman logo prints on some garments: the logo is a trademark, so paint it out.
-// [cx, cy, r] discs (normalised, top-left origin) filled from the ring of cloth around them.
-const LOGO_DISCS = {
-  male_casualsuit02: [[0.57, 0.17, 0.085]], male_casualsuit04: [[0.555, 0.165, 0.085]], male_casualsuit06: [[0.3, 0.155, 0.075], [0.42, 0.155, 0.075], [0.54, 0.155, 0.075]],
-  female_casualsuit01: [[0.775, 0.225, 0.085]], female_casualsuit02: [[0.775, 0.225, 0.085]], female_sportsuit01: [[0.775, 0.225, 0.085]],
+// [x0, y0, x1, y1] boxes (normalised, top-left origin). Inside a box, pixels that differ from the
+// cloth's median colour (orange figure, pale ring, dark lettering) are replaced by that median plus grain.
+const LOGO_BOXES = {
+  male_casualsuit02: [[0.485, 0.10, 0.655, 0.25]], male_casualsuit04: [[0.47, 0.095, 0.64, 0.245]], male_casualsuit06: [[0.16, 0.10, 0.82, 0.22]],
+  female_casualsuit01: [[0.69, 0.14, 0.885, 0.37]], female_casualsuit02: [[0.69, 0.14, 0.885, 0.37]], female_sportsuit01: [[0.69, 0.14, 0.885, 0.37]],
 };
-async function removeLogo(src, discs) {
+async function removeLogo(src, boxes) {
   const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const W = info.width, H = info.height, px = (x, y) => 4 * (Math.min(H - 1, Math.max(0, Math.round(y))) * W + Math.min(W - 1, Math.max(0, Math.round(x))));
-  for (const [cx, cy, r] of discs) {
-    const X = cx * W, Y = cy * H, R = r * W;
-    for (let y = Math.floor(Y - R); y <= Y + R; y++) for (let x = Math.floor(X - R); x <= X + R; x++) {
-      const d = Math.hypot(x - X, y - Y); if (d > R) continue;
-      const a = Math.atan2(y - Y, x - X); const acc = [0, 0, 0]; let n = 0;
-      for (let k = -3; k <= 3; k++) for (const rr of [1.04, 1.1, 1.16]) {
-        const q = px(X + Math.cos(a + k * 0.09) * R * rr, Y + Math.sin(a + k * 0.09) * R * rr);
-        acc[0] += data[q]; acc[1] += data[q + 1]; acc[2] += data[q + 2]; n++;
-      }
-      // blend toward the opposite side so the fill has no radial seams
-      const o = px(X - Math.cos(a) * R * 1.08, Y - Math.sin(a) * R * 1.08); const t = 0.5 * (1 - d / R);
-      const i = px(x, y);
-      for (let c = 0; c < 3; c++) data[i + c] = (acc[c] / n) * (1 - t) + data[o + c] * t;
+  const W = info.width, H = info.height;
+  const med = (a) => { a.sort((p, q) => p - q); return a[a.length >> 1]; };
+  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (const [x0, y0, x1, y1] of boxes) {
+    const X0 = Math.round(x0 * W), X1 = Math.round(x1 * W), Y0 = Math.round(y0 * H), Y1 = Math.round(y1 * H);
+    const R = [], G = [], B = [];
+    for (let y = Y0; y < Y1; y++) for (let x = X0; x < X1; x++) { const i = 4 * (y * W + x); R.push(data[i]); G.push(data[i + 1]); B.push(data[i + 2]); }
+    const m = [med(R), med(G), med(B)], ml = 0.3 * m[0] + 0.59 * m[1] + 0.11 * m[2], mrb = m[0] - m[2];
+    const bw = X1 - X0, bh = Y1 - Y0, flag = new Uint8Array(bw * bh);
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const i = 4 * ((y + Y0) * W + x + X0), l = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+      if (Math.abs(l - ml) > 22 || Math.abs(data[i] - data[i + 2] - mrb) > 24) flag[y * bw + x] = 1;
+    }
+    const grown = new Uint8Array(flag);
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (flag[y * bw + x]) for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < bw && yy < bh) grown[yy * bw + xx] = 1;
+    }
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (grown[y * bw + x]) {
+      const i = 4 * ((y + Y0) * W + x + X0), n = (rnd() - 0.5) * 7;
+      for (let c = 0; c < 3; c++) data[i + c] = Math.max(0, Math.min(255, m[c] + n));
     }
   }
   return sharp(data, { raw: { width: W, height: H, channels: 4 } });
@@ -88,6 +95,12 @@ async function removeLogo(src, discs) {
 async function tex(src, dst, opts = {}) {
   if (!fs.existsSync(src)) return null;
   let img = opts.logo ? await removeLogo(src, opts.logo) : sharp(src);
+  if (opts.clearLens) {
+    // the lens area is authored half-opaque and dark (sunglasses): make it a faint clear tint
+    const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 60 && data[i + 3] < 215) { data[i + 3] = 34; data[i] = 190; data[i + 1] = 205; data[i + 2] = 215; }
+    img = sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } });
+  }
   if (opts.size) img = img.resize(opts.size, opts.size, { fit: 'inside' });
   await img.webp({ quality: opts.q ?? 88, alphaQuality: 95, effort: 5 }).toFile(path.join(OUT, dst));
   return dst;
@@ -281,7 +294,7 @@ for (const [cat, name, slot, label, credit] of CATALOG) {
   const faces = jsonFaces(j);
   const del = []; m.deleteVerts.forEach((x, i) => { if (x) del.push(i); });
   const id0 = name.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase();
-  const texDiff = mat.mapDiffuse ? await tex(path.join(dir, mat.mapDiffuse), `tex/${id0}_d.webp`, { q: 90, logo: LOGO_DISCS[name] }) : null;
+  const texDiff = mat.mapDiffuse ? await tex(path.join(dir, mat.mapDiffuse), `tex/${id0}_d.webp`, { q: 90, logo: LOGO_BOXES[name], clearLens: name === 'glasses' }) : null;
   const texNorm = mat.mapNormal ? await tex(path.join(dir, mat.mapNormal), `tex/${id0}_n.webp`, { q: 86 }) : null;
   const thumb = await tex(path.join(dir, name + '.thumb.png'), `thumbs/${id0}.webp`, { size: 128, q: 80 });
   credits.add(credit);

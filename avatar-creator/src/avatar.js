@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { targetWeights } from './modifiers.js';
 import { CONFIG } from './config.js';
-import { url } from './data.js';
+import { url, spread } from './data.js';
 
 export const EXPRESSIONS = {
   blinkL: [['eye-left-closure', 1]],
@@ -89,7 +89,7 @@ export class Avatar {
     this._addExprMorphs(g, B.vmap, B.nR, (name) => this.expr[name]);
     this.skinMaterial = new THREE.MeshPhysicalMaterial({
       map: skinTexture, roughness: 0.52, metalness: 0, specularIntensity: 0.45,
-      sheen: 0.35, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.9, 0.42, 0.32),
+      sheen: 0.14, sheenRoughness: 0.5, sheenColor: new THREE.Color(1.0, 0.62, 0.5),
     });
     this.body = this._skinned(g, this.skinMaterial, 'Body');
     this.root.add(this.body);
@@ -143,10 +143,19 @@ export class Avatar {
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0);
         const id = ctx.getImageData(0, 0, img.width, img.height); const d = id.data;
+        // mean luminance of the solid pixels; soft-edge pixels often carry a pale matte colour, so pull them to the mean
         let sum = 0, n = 0;
-        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 40) { sum += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; n++; }
-        const k = n ? 165 / (sum / n) : 1;
-        for (let i = 0; i < d.length; i += 4) { const l = Math.min(255, (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) * k); d[i] = d[i + 1] = d[i + 2] = l; }
+        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { sum += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; n++; }
+        const mean = n ? Math.max(1, sum / n) : 128;
+        // lift very dark sources with a gamma first (keeps strand contrast), then gain to a common level
+        const gamma = Math.max(0.35, Math.min(1, Math.log(150 / 255) / Math.log(mean / 255)));
+        const lifted = 255 * Math.pow(mean / 255, gamma), gain = Math.min(2.2, 160 / lifted);
+        for (let i = 0; i < d.length; i += 4) {
+          const a = d[i + 3] / 255; let l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+          l = l * a + mean * (1 - a);
+          l = Math.min(255, 255 * Math.pow(l / 255, gamma) * gain);
+          d[i] = d[i + 1] = d[i + 2] = l;
+        }
         ctx.putImageData(id, 0, 0); t.image = canvas; t.needsUpdate = true;
       };
       img.src = url(file);
@@ -188,10 +197,10 @@ export class Avatar {
   _material(slot, meta) {
     const color = this.state.colors[slot];
     if (slot === 'eyes') {
-      return new THREE.MeshPhysicalMaterial({ map: this.eyeTexture(this.state.eyes.color), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, transparent: true, alphaTest: 0.02 });
+      return new THREE.MeshPhysicalMaterial({ map: this.eyeTexture(this.state.eyes.color), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, transparent: true, alphaTest: 0.02, envMapIntensity: 0.55 });
     }
     if (slot === 'hair') {
-      return new THREE.MeshStandardMaterial({ map: this.texture(meta.map, { gray: true }), color: new THREE.Color(color || '#3a2a1f'), roughness: 0.55, alphaTest: 0.32, alphaToCoverage: true, side: THREE.DoubleSide });
+      return new THREE.MeshStandardMaterial({ map: this.texture(meta.map, { gray: true }), color: new THREE.Color(color || '#3a2a1f'), roughness: 0.78, envMapIntensity: 0.45, alphaTest: 0.14, alphaToCoverage: true, side: THREE.DoubleSide });
     }
     if (slot === 'brows' || slot === 'lashes') {
       return new THREE.MeshStandardMaterial({
@@ -206,6 +215,9 @@ export class Avatar {
     });
     if (meta.normal) { m.normalMap = this.texture(meta.normal, { srgb: false }); m.normalScale.set(0.8, 0.8); }
     if (slot === 'glasses') { m.alphaTest = 0; m.transparent = true; m.roughness = 0.2; }
+    // outer layers win where two garments nearly touch (boots under jeans, shirt over waistband)
+    const layer = { shoes: 1, extra: 1, bottom: 2, top: 3, full: 3 }[slot];
+    if (layer) { m.polygonOffset = true; m.polygonOffsetFactor = -layer; m.polygonOffsetUnits = -layer * 2; }
     return m;
   }
 
@@ -317,7 +329,16 @@ export class Avatar {
     // proxies
     for (const [slot, part] of this.parts) {
       const p = part.proxy, P = part.P;
-      const sc = p.scale.map(([a, b, den], ax) => Math.abs(V[3 * b + ax] - V[3 * a + ax]) / den);
+      let sc;
+      if (p.baseSpread) {
+        // an axis along which the item is thin gives a noisy ratio: use the wide axes' mean there
+        const cur = spread(V, p.refSet), bs = p.baseSpread, top = Math.max(bs[0], bs[1], bs[2]);
+        const ratio = cur.map((x, ax) => x / bs[ax]);
+        const wide = [0, 1, 2].filter((ax) => bs[ax] >= 0.5 * top), mean = wide.reduce((a, ax) => a + ratio[ax], 0) / wide.length;
+        sc = ratio.map((r, ax) => Math.min(1.3, Math.max(0.78, bs[ax] >= 0.5 * top ? r : mean)));
+      }
+      else sc = p.scale.map(([a, b, den], ax) => Math.abs(V[3 * b + ax] - V[3 * a + ax]) / den);
+      part.sc = sc;
       for (let i = 0; i < p.nP; i++) {
         const a = p.ref[3 * i] * 3, b = p.ref[3 * i + 1] * 3, c = p.ref[3 * i + 2] * 3;
         const wa = p.bary[3 * i], wb = p.bary[3 * i + 1], wc = p.bary[3 * i + 2];

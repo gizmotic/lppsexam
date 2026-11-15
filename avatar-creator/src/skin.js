@@ -13,7 +13,8 @@ const VERT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = v
 const FRAG = /* glsl */`
 precision highp float;
 varying vec2 vUv;
-uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uAtlas;
+uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uAtlas, uPos;
+uniform float uHasPos;
 uniform float uAgeMix, uFreckles, uBodyFreckles, uSeed, uLip, uBlush, uShadow, uBeard, uUnderTop, uUnderBottom;
 uniform vec3 uToneMul, uLipColor, uBlushColor, uShadowColor, uHairColor, uUnderColor;
 uniform vec4 uMoles[${MAX_MOLES}];
@@ -49,12 +50,12 @@ void main(){
   c.gb *= 1.0 - (vnoise(vUv * 55.0) - 0.5) * 0.035;
 
   // blush
-  c *= mix(vec3(1.0), uBlushColor / max(lum(uBlushColor), 0.2) * 0.92, clamp(mA.g * uBlush, 0.0, 1.0));
+  c *= mix(vec3(1.0), uBlushColor / max(lum(uBlushColor), 0.2) * 0.92, clamp(mA.g * uBlush * 0.8, 0.0, 1.0));
   // eye shadow
   float lid = smoothstep(0.12, 0.55, mA.b) * uShadow;
   c = mix(c, uShadowColor * (0.55 + 0.6 * lum(c)), lid * 0.85);
   // lips
-  float lip = smoothstep(0.30, 0.62, mA.r) * uLip;
+  float lip = smoothstep(0.30, 0.52, mA.r) * uLip;
   c = mix(c, uLipColor * (0.5 + 0.75 * lum(c)), lip * 0.9);
 
   // freckles: face cluster + body
@@ -64,9 +65,9 @@ void main(){
   c = mix(c, c * vec3(0.70, 0.52, 0.42), fr * thin * min(frMask * 1.5, 0.85) * (1.0 - lip));
 
   // beard shadow + stubble
-  float bm = smoothstep(0.15, 0.6, mB.b) * uBeard * (1.0 - smoothstep(0.2, 0.5, mA.r));
-  float stub = spots(vUv, 2100.0, 0.85, 3.0);
-  c = mix(c, uHairColor * 0.55 + c * 0.25, bm * (0.28 + 0.6 * stub));
+  float bm = smoothstep(0.15, 0.6, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
+  float stub = max(spots(vUv, 3400.0, 0.9, 3.0), spots(vUv, 2300.0, 0.7, 9.0));
+  c = mix(c, uHairColor * 0.5 + c * 0.3, bm * (0.36 + 0.5 * stub));
 
   // moles
   for (int i = 0; i < ${MAX_MOLES}; i++) {
@@ -89,13 +90,32 @@ void main(){
     }
   }
   // underwear base layer
-  float ub = max(smoothstep(0.46, 0.54, mB.r) * uUnderBottom, smoothstep(0.46, 0.54, mB.g) * uUnderTop);
-  float hem = max(smoothstep(0.46, 0.54, mB.r) - smoothstep(0.62, 0.7, mB.r), smoothstep(0.46, 0.54, mB.g) - smoothstep(0.62, 0.7, mB.g));
+  float mb = smoothstep(0.46, 0.54, mB.r), mt = smoothstep(0.46, 0.54, mB.g);
+  float hem = max(mb - smoothstep(0.62, 0.7, mB.r), mt - smoothstep(0.62, 0.7, mB.g));
+  if (uHasPos > 0.5) {
+    // crisp edges from the rest-pose position of each texel (decimetres, origin at mid body)
+    vec4 bp = texture2D(uPos, vUv); float e = 0.012, ax = abs(bp.x);
+    float inB = smoothstep(-0.96 - e, -0.96 + e, bp.y) * (1.0 - smoothstep(0.9 - e, 0.9 + e, bp.y)) * step(ax, 2.6);
+    float inT = smoothstep(3.36 - e, 3.36 + e, bp.y) * (1.0 - smoothstep(4.74 - e, 4.74 + e, bp.y)) * (1.0 - smoothstep(1.56 - e, 1.56 + e, ax));
+    float bandB = 1.0 - smoothstep(0.0, 0.11, min(bp.y + 0.96, 0.9 - bp.y));
+    float bandT = 1.0 - smoothstep(0.0, 0.09, min(min(bp.y - 3.36, 4.74 - bp.y), 1.56 - ax));
+    mb = inB * bp.a; mt = inT * bp.a; hem = max(mb * bandB, mt * bandT);
+  }
+  float ub = max(mb * uUnderBottom, mt * uUnderTop);
   vec3 cloth = uUnderColor * (0.93 + 0.07 * sin(vUv.x * 5200.0) * sin(vUv.y * 5200.0)) * (1.0 - 0.10 * hem);
   c = mix(c, cloth, ub);
 
   gl_FragColor = vec4(toLinear(clamp(c, 0.0, 1.0)), 1.0);
 }`;
+
+// fills texels outside the UV islands with the average of their valid neighbours (keeps seams clean)
+const SPREAD = /* glsl */`
+precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform float uPx;
+void main(){ vec4 m = texture2D(uTex, vUv);
+  if (m.a < 0.5) { vec4 s = vec4(0.0);
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec4 n = texture2D(uTex, vUv + vec2(float(x), float(y)) * uPx); if (n.a > 0.5) s += vec4(n.rgb, 1.0); }
+    m = s.a > 0.0 ? vec4(s.rgb / s.a, 1.0) : vec4(0.0); }
+  gl_FragColor = m; }`;
 
 const DILATE = /* glsl */`
 precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform float uPx;
@@ -121,7 +141,7 @@ export class SkinCompositor {
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
       uniforms: {
-        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uAtlas: { value: this.atlas },
+        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 },
         uAgeMix: { value: 0 }, uFreckles: { value: 0 }, uBodyFreckles: { value: 0 }, uSeed: { value: 1 }, uLip: { value: 0 }, uBlush: { value: 0 },
         uShadow: { value: 0 }, uBeard: { value: 0 }, uUnderTop: { value: 0 }, uUnderBottom: { value: 1 },
         uToneMul: { value: new THREE.Vector3(1, 1, 1) }, uLipColor: { value: new THREE.Color() }, uBlushColor: { value: new THREE.Color() },
@@ -133,15 +153,17 @@ export class SkinCompositor {
 
   // per-vertex region masks rendered once into UV space
   _buildMasks() {
-    const D = this.D, B = D.body, nV = D.nV, P = D.pos;
+    const D = this.D, B = D.body, nV = D.nV, P = D.pos, r0 = this.renderer;
     const A = new Float32Array(nV * 4), M = new Float32Array(nV * 4);
     const fromTargets = (names, ch, arr, gain) => {
       const mag = new Float32Array(nV); let max = 0;
       for (const n of names) { const t = D.target(n); if (!t) { console.warn('mask target missing', n); continue; }
         for (let k = 0; k < t.n; k++) { const m = Math.hypot(t._d[3 * k], t._d[3 * k + 1], t._d[3 * k + 2]) * t.s; const v = t._i[k]; mag[v] = Math.max(mag[v], m); if (mag[v] > max) max = mag[v]; } }
-      for (let v = 0; v < nV; v++) arr[4 * v + ch] = Math.min(1, mag[v] / max * gain);
+      for (let v = 0; v < nV; v++) arr[4 * v + ch] = Math.max(arr[4 * v + ch], Math.min(1, mag[v] / max * gain));
     };
-    fromTargets(['mouth/mouth-upperlip-volume-incr', 'mouth/mouth-lowerlip-volume-incr'], 0, A, 2.2);
+    // lips: the lip-volume morphs move exactly the lip surface; each lip normalised on its own
+    fromTargets(['mouth/mouth-upperlip-volume-incr'], 0, A, 1);
+    fromTargets(['mouth/mouth-lowerlip-volume-incr'], 0, A, 1);
     fromTargets(['expression/units/caucasian/eye-left-closure', 'expression/units/caucasian/eye-right-closure'], 2, A, 1.6);
     const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
     const bonesOf = (re) => new Set(D.bones.map((b, i) => (re.test(b.name) ? i : -1)).filter((i) => i >= 0));
@@ -160,7 +182,7 @@ export class SkinCompositor {
       M[4 * v + 1] = ss(3.2, 3.36, y) * ss(4.82, 4.66, y) * (wsum(v, torso) > 0.55 && ax < 1.7 ? 1 : 0);
       // beard: jaw, chin, upper lip
       const side = ss(0.05, 0.5, z) * ss(1.0, 0.75, ax);
-      M[4 * v + 2] = y > 5.7 && y < 7 ? side * ss(6.9, 6.72, y - 0.12 * Math.max(0, 0.5 - ax)) * ss(5.85, 6.1, y + 0.25 * Math.max(0, z - 0.8)) : 0;
+      M[4 * v + 2] = y > 5.7 && y < 7 ? side * ss(7.08, 6.62, y - 0.12 * Math.max(0, 0.5 - ax)) * ss(5.85, 6.1, y + 0.25 * Math.max(0, z - 0.8)) : 0;
       // body freckles: shoulders, arms, upper chest/back
       M[4 * v + 3] = Math.max(wsum(v, arms) * 0.9, wsum(v, torso) * ss(4.4, 5.2, y) * ss(6.1, 5.6, y));
     }
@@ -180,20 +202,29 @@ export class SkinCompositor {
     });
     const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false;
     const scene = new THREE.Scene(); scene.add(mesh);
-    const mk = () => new THREE.WebGLRenderTarget(1024, 1024, { depthBuffer: false });
+    const floatOK = r0.extensions.has('EXT_color_buffer_float') || r0.extensions.has('EXT_color_buffer_half_float');
+    let rtType = THREE.UnsignedByteType;
+    const mk = () => new THREE.WebGLRenderTarget(1024, 1024, { depthBuffer: false, type: rtType });
     const r = this.renderer, prev = r.getRenderTarget(), prevClear = r.getClearColor(new THREE.Color()), prevAlpha = r.getClearAlpha();
     r.setClearColor(0x000000, 0);
     const dil = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: DILATE, uniforms: { uTex: { value: null }, uPx: { value: 1 / 1024 } }, depthTest: false, depthWrite: false });
-    const bake = (attr) => {
+    const bake = (attr, passes = 2, frag = null) => {
       g.setAttribute('aMask', new THREE.BufferAttribute(attr, 4));
       let a = mk(), b = mk();
       r.setRenderTarget(a); r.clear(); r.render(scene, this.cam);
+      if (frag) { dil.fragmentShader = frag; dil.needsUpdate = true; }
       this.quad.material = dil;
-      for (let i = 0; i < 2; i++) { dil.uniforms.uTex.value = a.texture; r.setRenderTarget(b); r.clear(); r.render(this.quadScene, this.cam); [a, b] = [b, a]; }
+      for (let i = 0; i < passes; i++) { dil.uniforms.uTex.value = a.texture; r.setRenderTarget(b); r.clear(); r.render(this.quadScene, this.cam); [a, b] = [b, a]; }
       b.dispose();
       return a;
     };
     this.maskA = bake(ca); this.maskB = bake(cb);
+    if (floatOK) {
+      const cp = new Float32Array(B.nR * 4);
+      for (let q = 0; q < B.nR; q++) { const v = B.vmap[q] * 3; cp[4 * q] = P[v]; cp[4 * q + 1] = P[v + 1]; cp[4 * q + 2] = P[v + 2]; cp[4 * q + 3] = 1; }
+      rtType = THREE.HalfFloatType;
+      this.posMap = bake(cp, 4, SPREAD);
+    }
     r.setRenderTarget(prev); r.setClearColor(prevClear, prevAlpha);
     g.dispose(); mat.dispose(); dil.dispose();
   }
@@ -218,7 +249,7 @@ export class SkinCompositor {
       const d = ctx.getImageData(21, 16, 9, 12).data; let r = 0, g = 0, b = 0;
       for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
       const n = d.length / 4 * 255; this.avg.set(id, [r / n, g / n, b / n]);
-      this.dirty = true;
+      if (this._last) this.apply(...this._last); else this.dirty = true;
     };
     img.src = url(`tex/skin_${id}.webp`);
     this.skinTex.set(id, t);
@@ -235,11 +266,12 @@ export class SkinCompositor {
 
   // s: state.skin ; ctx: { hairColor, gender }
   apply(s, ctx) {
+    this._last = [s, ctx];
     const u = this.material.uniforms;
     const a = this._skin(s.base), b = this._skin(this.oldVariant(s.base));
     u.uSkinA.value = a; u.uSkinB.value = b; u.uAgeMix.value = s.wrinkles;
     const avg = this.avg.get(s.base);
-    if (s.tone && avg) { const t = new THREE.Color(s.tone); u.uToneMul.value.set(t.r / avg[0], t.g / avg[1], t.b / avg[2]); }
+    if (s.tone && avg) { const t = new THREE.Color(s.tone).convertLinearToSRGB(); u.uToneMul.value.set(t.r / avg[0], t.g / avg[1], t.b / avg[2]); }
     else u.uToneMul.value.set(1, 1, 1);
     // THREE.Color parses hex as sRGB -> linear; the compositor works on raw sRGB values
     const raw = (hex, target) => { const c = new THREE.Color(hex); c.convertLinearToSRGB(); target.copy(c); };
@@ -248,7 +280,8 @@ export class SkinCompositor {
     u.uFreckles.value = s.freckles; u.uBodyFreckles.value = s.bodyFreckles; u.uSeed.value = s.freckleSeed;
     u.uLip.value = s.lipStrength; u.uBlush.value = s.blush; u.uShadow.value = s.shadow; u.uBeard.value = s.beard;
     u.uUnderBottom.value = CONFIG.underwear ? 1 : 0;
-    u.uUnderTop.value = CONFIG.underwear && (s.underTop === 'on' || (s.underTop === 'auto' && ctx.gender < 0.5)) ? 1 : 0;
+    // auto: only when nothing covers the chest, so it never peeks out of a neckline
+    u.uUnderTop.value = CONFIG.underwear && (s.underTop === 'on' || (s.underTop === 'auto' && ctx.gender < 0.5 && !ctx.chestCovered)) ? 1 : 0;
     const moles = CONFIG.moles ? s.moles.slice(0, MAX_MOLES) : [];
     moles.forEach((m, i) => u.uMoles.value[i].set(m.u, m.v, m.r, m.d));
     u.uMoleCount.value = moles.length;

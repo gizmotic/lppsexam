@@ -237,8 +237,8 @@ export function buildUI(app) {
     const s = DEFAULT_STATE();
     if (kind === 'f') {
       Object.assign(s.macro, { gender: 0.0, cup: 0.5 });
-      Object.assign(s.parts, { hair: 'long01', brows: 'eyebrow006', top: 'female_casualsuit01_top', bottom: 'female_casualsuit01_bottom', shoes: 'shoes03' });
-      Object.assign(s.skin, { base: 'young_lightskinned_female', lipStrength: 0.35, blush: 0.25 });
+      Object.assign(s.parts, { hair: 'long01', brows: 'eyebrow006', top: 'female_casualsuit01_top', bottom: 'female_casualsuit01_bottom', shoes: 'shoes06' });
+      Object.assign(s.skin, { base: 'young_lightskinned_female', lipStrength: 0.3, blush: 0.15 });
       s.colors.hair = '#4a3323';
     } else {
       Object.assign(s.macro, { gender: 1.0 });

@@ -6,7 +6,7 @@ import { loadCore } from './data.js';
 import { Avatar } from './avatar.js';
 import { SkinCompositor } from './skin.js';
 import { Animator } from './anim.js';
-import { DEFAULT_STATE } from './modifiers.js';
+import { DEFAULT_STATE, GROUPS, sliderKey, targetWeights } from './modifiers.js';
 import { buildUI } from './ui.js';
 import { exportGLB, download } from './export.js';
 
@@ -65,13 +65,13 @@ scene.add(avatar.root);
 const animator = new Animator(avatar);
 
 const app = {
-  THREE, D, state, avatar, skin, animator, camera, controls, scene, renderer,
+  THREE, D, state, avatar, skin, animator, camera, controls, scene, renderer, modifiers: { GROUPS, sliderKey, targetWeights },
   panelWidth: 0, placing: null, listeners: new Set(),
   // ---- change notifications from the UI
   shapeChanged() { avatar.dirty.shape = true; app.save(); },
-  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender }); app.save(); },
+  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top) }); app.save(); },
   colorsChanged() { avatar.applyColors(); app.skinChanged(); },
-  async partsChanged() { await avatar.syncParts(); avatar.update(); animator.rebuild(); app.save(); },
+  async partsChanged() { await avatar.syncParts(); avatar.update(); animator.rebuild(); app.skinChanged(); },
   setAnim(id) { state.anim = id; animator.play(id); app.save(); },
   async setState(next) {
     for (const k of Object.keys(state)) delete state[k];
@@ -93,7 +93,7 @@ const app = {
       full: [H * 0.5, 0, H * 1.2, 0.18, 0.02], upper: [H * 0.74, 0, H * 0.66, 0.25, 0.02], mid: [H * 0.56, 0, H * 0.62, 0.3, 0.02],
       lower: [H * 0.28, 0, H * 0.64, 0.3, 0.05], feet: [0.09, 0.05, 0.62, 0.55, 0.3],
       face: [faceMid, eye.z - 0.06, 0.40, 0.2, 0.02], eyes: [eye.y - 0.005, eye.z - 0.04, 0.2, 0.12, 0.0], mouth: [jaw.y + 0.055, eye.z - 0.02, 0.2, 0.12, 0.0],
-      side: [faceMid, head.z, 0.42, 1.25, 0.02], hair: [head.y + 0.13, head.z, 0.56, 0.45, 0.08],
+      side: [faceMid, head.z, 0.42, 1.25, 0.02], hair: [head.y + 0.07, head.z, 0.5, 0.45, 0.08],
     }[name] || null;
     if (!F) return;
     const [cy, cz, size, az, el] = F;
@@ -130,6 +130,8 @@ const app = {
     return { u: hit.uv.x, v: hit.uv.y, uvPerMetre: Math.sqrt(areaU / Math.max(area3, 1e-9)) };
   },
 
+  // debug: show a region mask on the body (null restores the skin)
+  debugMask(which) { avatar.skinMaterial.map = which ? skin[which].texture : skin.texture; avatar.skinMaterial.needsUpdate = true; },
   async exportGLB(opts) { return exportGLB(app, opts); },
   screenshot() {
     renderer.render(scene, camera);

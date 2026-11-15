@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLB-Vorschau · Avatar-Studio</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: #201d1a;
+    background: radial-gradient(120% 90% at 50% 38%, #f6f2ec 0%, #e9e3db 48%, #cfc7bd 100%); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #bar { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    background: rgba(251, 249, 246, .88); padding: 6px; border-radius: 999px; box-shadow: 0 6px 20px rgba(60, 45, 30, .14); max-width: 92vw; }
+  button, label.file { border: 0; background: none; padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button:hover, label.file:hover { background: #ebe5dc; }
+  button.on { background: #0e8f7e; color: #fff; }
+  #info { position: fixed; left: 18px; top: 16px; font-size: 13px; line-height: 1.5; background: rgba(251, 249, 246, .88); padding: 10px 14px; border-radius: 12px; }
+  #info b { display: block; font-size: 15px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info"><b>GLB-Vorschau</b><span id="meta">Datei wählen oder hierher ziehen.</span></div>
+<div id="bar"><label class="file">GLB öffnen<input id="file" type="file" accept=".glb,model/gltf-binary" hidden></label></div>
+<script type="module" src="./src/viewer.js"></script>
+</body>
+</html>
