@@ -269,10 +269,11 @@ export function buildHair(D, id) {
   }
 
   // 4) collect geometry: every vertex = (scalp ref, offset from it, uv)
-  const R = [], B = [], O = [], UV = [], I = [];
+  const R = [], B = [], O = [], UV = [], I = [], SH = [];
   const uvOf = (h, len = 0) => (st.uv === 'back' ? [h.x * 1.5, (0.9 - h.z) * 0.45 + len * 0.3] : st.uv === 'up' ? [h.z * 1.4, h.y * 0.6] : [h.phi / 52, (90 - h.th) / 75 + len * 0.3]);
-  const add = (i, x, y, z, u, v) => { const q = mesh.verts[i]; R.push(q.r[0], q.r[1], q.r[2]); B.push(q.w[0], q.w[1], q.w[2]); O.push(x - bp[3 * i], y - bp[3 * i + 1], z - bp[3 * i + 2]); UV.push(u, v); return R.length / 3 - 1; };
-  for (let i = 0; i < nS; i++) { const [u, v] = uvOf(hs[i]); add(i, out[3 * i], out[3 * i + 1], out[3 * i + 2], u, v); }
+  const add = (i, x, y, z, u, v, sh = 1) => { const q = mesh.verts[i]; R.push(q.r[0], q.r[1], q.r[2]); B.push(q.w[0], q.w[1], q.w[2]); O.push(x - bp[3 * i], y - bp[3 * i + 1], z - bp[3 * i + 2]); UV.push(u, v); SH.push(sh); return R.length / 3 - 1; };
+  // roots are darker: the shell's thin front edge would otherwise catch the light as a pale band across the forehead
+  for (let i = 0; i < nS; i++) { const [u, v] = uvOf(hs[i]); add(i, out[3 * i], out[3 * i + 1], out[3 * i + 2], u, v, 0.42 + 0.58 * ss(0, 0.5, hs[i].s)); }
   I.push(...mesh.tris);
 
   // open edges of the shell, in order
@@ -374,7 +375,7 @@ export function buildHair(D, id) {
 
   const nP = R.length / 3;
   const p = { id, meta: D.proxies[id], gen: true, nP, nR: nP, ref: Uint16Array.from(R), bary: Float32Array.from(B), off: Float32Array.from(O),
-    vmap: Uint16Array.from({ length: nP }, (_, i) => i), uv: Float32Array.from(UV), idx: Uint32Array.from(I), del: new Uint16Array(0), scale: null };
+    vmap: Uint16Array.from({ length: nP }, (_, i) => i), shade: Float32Array.from(SH), uv: Float32Array.from(UV), idx: Uint32Array.from(I), del: new Uint16Array(0), scale: null };
   return finishProxy(D, p);
 }
 

@@ -254,12 +254,12 @@ export class Avatar {
     if (slot === 'hair' && meta.gen) {
       // generated hair: solid sculpted geometry, strand pattern as tint and relief
       const strands = hairTexture(meta.tex);
-      return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: meta.tex === 'strand' ? 2.4 : 3.4, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.6, envMapIntensity: 0.55, side: THREE.DoubleSide });
+      return new THREE.MeshStandardMaterial({ vertexColors: true, map: strands, bumpMap: strands, bumpScale: meta.tex === 'strand' ? 2.4 : 3.4, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.6, envMapIntensity: 0.55, side: THREE.DoubleSide });
     }
     if (slot === 'hair') {
       // opaque core; the soft strand tips are drawn by a second, blended pass (see _softHair)
       const strands = this.texture(meta.map, { gray: true, cleanEdge: CONFIG.hairCleanEdge });
-      return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: 1.6, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.62, envMapIntensity: 0.5, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide });
+      return new THREE.MeshStandardMaterial({ vertexColors: true, map: strands, bumpMap: strands, bumpScale: 1.6, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.62, envMapIntensity: 0.5, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide });
     }
     if (slot === 'brows' || slot === 'lashes') {
       return new THREE.MeshStandardMaterial({
@@ -331,6 +331,7 @@ export class Avatar {
       g.setAttribute('uv', new THREE.BufferAttribute(proxy.uv, 2));
       g.setAttribute('skinIndex', new THREE.BufferAttribute(proxy.skinIdx, 4));
       g.setAttribute('skinWeight', new THREE.BufferAttribute(proxy.skinW, 4));
+      if (proxy.shade) { const c = new Float32Array(proxy.nR * 3); for (let i = 0; i < proxy.nR; i++) c[3 * i] = c[3 * i + 1] = c[3 * i + 2] = proxy.shade[i]; g.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
       g.setIndex(new THREE.BufferAttribute(proxy.idx, 1));
       if (FACE_SLOTS.has(slot)) {
         if (!proxy.exprDense) {
