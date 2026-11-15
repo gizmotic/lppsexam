@@ -5,7 +5,7 @@
 export const DEFAULT_STATE = () => ({
   macro: { gender: 0.5, age: 0.0, muscle: 0.5, weight: 0.5, height: 0.5, proportions: 0.5, cup: 0.5, firmness: 0.5, african: 0, asian: 0, caucasian: 1 },
   mods: {},
-  parts: { hair: 'short03', brows: 'eyebrow001', lashes: 'eyelashes01', top: 'male_casualsuit04_top', bottom: 'male_casualsuit02_bottom', full: null, shoes: 'shoes05', hat: null, glasses: null, extra: null },
+  parts: { hair: 'short02', brows: 'eyebrow001', lashes: 'eyelashes01', top: 'male_casualsuit04_top', bottom: 'male_casualsuit02_bottom', full: null, shoes: 'shoes05', hat: null, glasses: null, extra: null },
   colors: { hair: '#3a2a1f', brows: '#2e2119', top: null, bottom: null, full: null, shoes: null, hat: null, glasses: null, extra: null },
   eyes: { color: '#6b4226' },
   skin: {

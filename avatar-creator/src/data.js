@@ -3,6 +3,20 @@ const BASE = import.meta.env.BASE_URL + 'assets/';
 
 export const url = (p) => BASE + p;
 
+// Images for canvas or WebGL use go through fetch -> blob: a page embedded in a sandboxed frame has an opaque origin,
+// where a plain <img src> of its own files counts as cross-origin and taints the canvas / is refused by WebGL.
+export async function loadImage(p) {
+  const r = await fetch(url(p));
+  if (!r.ok) throw new Error('image missing: ' + p);
+  const src = URL.createObjectURL(await r.blob());
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    return img;
+  } finally { setTimeout(() => URL.revokeObjectURL(src), 30000); }
+}
+
 // Some static hosts refuse ".bin"; a build with VITE_BIN_EXT=wasm (see tools/build-page.mjs) serves the same bytes under another extension.
 const BIN_EXT = import.meta.env.VITE_BIN_EXT || 'bin';
 

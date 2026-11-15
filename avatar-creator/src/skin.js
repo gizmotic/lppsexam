@@ -2,7 +2,7 @@
 // moles ("Punkterl"), beard shadow, tattoos and a painted underwear layer -> one texture.
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
-import { url } from './data.js';
+import { loadImage } from './data.js';
 
 export const MAX_MOLES = 24, MAX_TATTOOS = 8;
 export const TATTOO_GLYPHS = ['★', '♥', '☾', '⚓', '☀', '♪', '∞', '✿', '⚡', '☯', '♠', '✦', '❖', '➳', '☘', '♛'];
@@ -76,7 +76,7 @@ void main(){
   c = mix(c, c * vec3(0.70, 0.52, 0.42), fr * thin * min(frMask * 1.5, 0.85) * (1.0 - lip));
 
   // beard shadow + stubble
-  float bm = smoothstep(0.15, 0.6, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
+  float bm = smoothstep(0.02, 0.95, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
   float stub = max(spots(vUv, 3400.0, 0.9, 3.0), spots(vUv, 2300.0, 0.7, 9.0));
   c = mix(c, c * (uHairColor * 0.6 + 0.12), bm * (0.22 + 0.78 * stub));
 
@@ -192,8 +192,8 @@ export class SkinCompositor {
       M[4 * v] = ss(-1.0, -0.86, y) * ss(1.08, 0.96, y) * (wsum(v, legs) > 0.5 ? 1 : 0);
       M[4 * v + 1] = ss(3.2, 3.36, y) * ss(4.82, 4.66, y) * (wsum(v, torso) > 0.55 && ax < 1.7 ? 1 : 0);
       // beard: jaw, chin, upper lip
-      const side = ss(0.05, 0.5, z) * ss(1.0, 0.75, ax);
-      M[4 * v + 2] = y > 5.7 && y < 7 ? side * ss(7.08, 6.62, y - 0.12 * Math.max(0, 0.5 - ax)) * ss(5.85, 6.1, y + 0.25 * Math.max(0, z - 0.8)) : 0;
+      const side = ss(-0.1, 0.7, z) * ss(1.05, 0.7, ax);
+      M[4 * v + 2] = y > 5.7 && y < 7 ? side * ss(7.2, 6.5, y - 0.12 * Math.max(0, 0.5 - ax)) * ss(5.85, 6.1, y + 0.25 * Math.max(0, z - 0.8)) : 0;
       // body freckles: shoulders, arms, upper chest/back
       M[4 * v + 3] = Math.max(wsum(v, arms) * 0.9, wsum(v, torso) * ss(4.4, 5.2, y) * ss(6.1, 5.6, y));
     }
@@ -252,8 +252,7 @@ export class SkinCompositor {
     let t = this.skinTex.get(id);
     if (t) return t;
     t = new THREE.Texture(); t.colorSpace = THREE.NoColorSpace; t.loaded = false;
-    const img = new Image();
-    img.onload = () => {
+    loadImage(`tex/skin_${id}.webp`).then((img) => {
       t.image = img; t.needsUpdate = true; t.loaded = true;
       const cv = document.createElement('canvas'); cv.width = cv.height = 64;
       const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, 64, 64);
@@ -262,8 +261,7 @@ export class SkinCompositor {
       this.avg.set(id, mean(21, 16, 9, 12));            // chest
       this.avgFace.set(id, mean(50, 22, 5, 5));         // cheek (the face island sits on the right, turned sideways)
       if (this._last) this.apply(...this._last); else this.dirty = true;
-    };
-    img.src = url(`tex/skin_${id}.webp`);
+    });
     this.skinTex.set(id, t);
     return t;
   }

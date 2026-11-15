@@ -254,7 +254,9 @@ export function buildUI(app) {
     const gauss = () => (R() + R() + R() - 1.5) / 1.5;                 // roughly normal, -1..1
     const female = R() < 0.5;
     const age = R() < 0.6 ? R() * 0.25 : R() < 0.6 ? 0.25 + R() * 0.35 : 0.6 + R() * 0.4;
-    Object.assign(s.macro, { gender: female ? R() * 0.3 : 0.7 + R() * 0.3, age, muscle: 0.25 + R() * 0.6, weight: 0.2 + R() * 0.65, height: 0.25 + R() * 0.5, cup: 0.25 + R() * 0.55, proportions: 0.3 + R() * 0.5 });
+    // weight mostly near the middle (it dominates jaw and cheeks), with the odd slim or heavy build
+    const weight = Math.max(0.05, Math.min(0.95, 0.45 + gauss() * (R() < 0.25 ? 0.45 : 0.16)));
+    Object.assign(s.macro, { gender: female ? R() * 0.3 : 0.7 + R() * 0.3, age, muscle: 0.25 + R() * 0.6, weight, height: 0.25 + R() * 0.5, cup: 0.25 + R() * 0.55, proportions: 0.3 + R() * 0.5 });
     // one dominant build type with a varying share of the others
     const e = [R() * 0.5, R() * 0.5, R() * 0.5]; e[Math.floor(R() * 3)] += 0.6 + R();
     Object.assign(s.macro, { caucasian: e[0], african: e[1], asian: e[2] });
@@ -263,8 +265,12 @@ export function buildUI(app) {
       if (!['head', 'forehead', 'eyes', 'brows', 'nose', 'mouth', 'cheek', 'chin', 'ears', 'neck'].includes(g.id)) continue;
       for (const sl of g.sliders) {
         if (!sl[2] && !sl[3]) continue;
-        const strong = R() < 0.18;
-        const v = gauss() * (strong ? 0.95 : 0.42);
+        // mouth, chin and nose carry most of a face's identity: they get a wider spread; the base mouth is small, so width leans up
+        const key = g.id === 'mouth' || g.id === 'chin' || g.id === 'nose';
+        const strong = R() < (key ? 0.35 : 0.18);
+        let v = gauss() * (strong ? 1.0 : key ? 0.55 : 0.42);
+        if (sl[1] === 'mouth/mouth-scale-horiz') v += 0.3;
+        if (sl[1] === 'mouth/mouth-angles') v += 0.15;
         if (Math.abs(v) > 0.05) s.mods[sliderKey(sl)] = Math.max(-1, Math.min(1, v));
       }
     }

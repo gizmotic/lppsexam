@@ -27,3 +27,20 @@
 - Foto-zu-Avatar, Shop/Accounts, Stoffsimulation (von Anfang an ausgeschlossen).
 - Bärte als Geometrie (Lizenz unklar) → Bartschatten in der Haut.
 - Import fremder Animationen (Mixamo-Retargeting): nicht gebaut.
+
+## Nach den Kritiker-Runden
+
+15. **Haarkanten geglättet statt Rohtextur.** Die 512-px-Strähnenmaske ergab ausgefranste Ränder (zwei Runden bemängelt). Die
+    Deckung wird jetzt weichgezeichnet und neu gehärtet → eine ruhige Kontur. Ein zweiter, weicher Haar-Durchgang wurde
+    versucht und abgeschaltet (heller Saum an der Stirn).
+16. **Zwei Frisuren abgeschaltet** (`short01`, `afro01`): nach zwei Runden weiter schwach. Gepackt, aber nicht angeboten.
+17. **Kleidung über Kleidung per Regel:** Hut blendet Haare im Hutkopf aus, langer Mantel blendet die Hose darunter aus,
+    getrennte Outfit-Teile verstecken nur den Körper, den sie wirklich bedecken. Keine echte Kollisionsberechnung.
+18. **Kleidung bekommt Luft** (3–17 mm entlang der Normalen, mehr bei hohem Gewicht) gegen durchstoßende Körper.
+19. **Altern überträgt nur Hell/Dunkel** der älteren Hauttextur (Falten), nicht deren Farbstich.
+20. **„Muskelmasse" zieht ab der Mitte die Muskel-Detailformen mit** – das Makro allein brachte fast nur Masse.
+21. **Eigene Vorschaubilder** aus der App gerendert statt der uneinheitlichen mitgelieferten.
+22. **Hauttöne als gedämpfte Albedo-Werte**, plus 10 % Entsättigung: die Quellen wirkten im Studiolicht orange.
+23. **Zufall würfelt jeden Gesichtsregler einzeln** (meist klein, jeder fünfte kräftig) plus Kopfform-Typ, Körperbau-Mix,
+    Alter, Haut und Haare.
+24. **Veröffentlichte Vorschau als Seite:** Binärdateien dort unter `.wasm`, weil `.bin` nicht ausgeliefert wird.
