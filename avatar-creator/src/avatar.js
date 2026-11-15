@@ -452,6 +452,7 @@ export class Avatar {
         if (slot === 'shoes' && y < minY) minY = y;
         if ((slot === 'hair' || slot === 'hat') && y > maxY) maxY = y;
       }
+      if (this._tmp.length < p.nP * 3) this._tmp = new Float32Array(p.nP * 3);   // generated hair can have more vertices than the base mesh
       computeNormals(P, p.nP, p.idx, p.vmap, gn.array, this._tmp);
       if (slot === 'top' || slot === 'bottom' || slot === 'full') {
         // a little air between cloth and body, more on heavy builds where the body would otherwise poke through
