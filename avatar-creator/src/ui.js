@@ -2,6 +2,7 @@
 import { GROUPS, MACROS, ETHNIC, sliderKey, DEFAULT_STATE } from './modifiers.js';
 import { SKIN_TONES, TATTOO_GLYPHS, MAX_MOLES, MAX_TATTOOS } from './skin.js';
 import { CLIPS } from './anim.js';
+import { HAIR_SETS } from './hair.js';
 import { CONFIG } from './config.js';
 import { url } from './data.js';
 import { download } from './export.js';
@@ -172,7 +173,7 @@ export function buildUI(app) {
       section('Hosen & Röcke', 'lower', partGrid('bottom', CONFIG.schoolSafe ? {} : { none: 'Keine' }), sub('Farbe'), colorRow('bottom', CLOTH_COLORS, 'Original')),
       section('Kleider & Outfits', 'full', note('Ein Outfit ersetzt Oberteil und Hose.'), partGrid('full', { none: 'Keines' }), sub('Farbe'), colorRow('full', CLOTH_COLORS, 'Original')),
       section('Schuhe', 'feet', partGrid('shoes', { none: 'Barfuß' }), sub('Farbe'), colorRow('shoes', CLOTH_COLORS, 'Original')),
-      section('Grundkleidung', 'full', note('Unterhemd und Shorts sind fest Teil jeder Figur und lassen sich nicht ausziehen.'),
+      CONFIG.paintedBase && section('Grundkleidung', 'full', note('Unterhemd und Shorts sind fest Teil jeder Figur.'),
         sub('Farbe'), swatches(['#e4e1dc', '#1d1d20', '#6b7280', '#b23b3b', '#2d6fb0', '#3f8f5a', '#d16a9a', '#e3c14a'], () => state.skin.underColor, (c) => { state.skin.underColor = c; app.skinChanged(); })),
     ] },
     { id: 'deco', label: 'Deko', cam: 'upper', build: () => [
@@ -240,9 +241,9 @@ export function buildUI(app) {
     const s = DEFAULT_STATE();
     if (kind === 'f') {
       Object.assign(s.macro, { gender: 0.0, cup: 0.5 });
-      Object.assign(s.parts, { hair: 'ponytail01', brows: 'eyebrow002', top: 'vnecktop', bottom: 'tightjeans', shoes: 'shoes05' });
+      Object.assign(s.parts, { hair: 'gen_long', brows: 'eyebrow005', top: 'vnecktop', bottom: 'tightjeans', shoes: 'shoes05' });
       Object.assign(s.skin, { base: 'young_lightskinned_female', lipStrength: 0.3, blush: 0.15 });
-      s.colors.hair = '#4a3323';
+      s.colors.hair = '#4a3323'; s.colors.brows = '#4a3323';
     } else {
       Object.assign(s.macro, { gender: 1.0 });
     }
@@ -288,9 +289,7 @@ export function buildUI(app) {
     s.skin.freckles = R() < 0.25 ? 0.3 + R() * 0.7 : 0; s.skin.freckleSeed = 1 + Math.floor(R() * 97);
     if (female) { s.skin.lipStrength = R() < 0.6 ? R() * 0.7 : 0; s.skin.lipColor = pick(LIP_COLORS); s.skin.blush = R() * 0.3; s.skin.shadow = R() < 0.3 ? R() * 0.6 : 0; s.skin.shadowColor = pick(SHADOW_COLORS); }
     else s.skin.beard = R() < 0.45 ? 0.3 + R() * 0.7 : 0;
-    // hair: the two fringes that cover an eye come up less often
-    const hairs = ids('hair').flatMap((h) => (/^bob/.test(h) ? [h] : [h, h, h]));
-    s.parts.hair = !female && R() < 0.12 ? null : pick(hairs.filter((h) => female || !/long|pony|braid|bob/.test(h)).length ? hairs.filter((h) => female || R() < 0.15 || !/long|pony|braid|bob/.test(h)) : hairs);
+    s.parts.hair = !female && R() < 0.06 ? null : pick(HAIR_SETS[female ? 'female' : 'male']);
     s.parts.brows = pick(ids('brows')); s.parts.lashes = pick(ids('lashes'));
     s.colors.hair = age > 0.7 && R() < 0.7 ? pick(['#8d8d8d', '#b9b9b9', '#e9e9e9']) : pick(darkish ? HAIR_COLORS.slice(0, 3) : HAIR_COLORS.slice(0, 9));
     s.colors.brows = /^#(8d|b9|e9)/.test(s.colors.hair) ? '#6a6a6a' : s.colors.hair;

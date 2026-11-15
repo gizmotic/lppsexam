@@ -8,6 +8,7 @@ import { SkinCompositor } from './skin.js';
 import { Animator } from './anim.js';
 import { DEFAULT_STATE, GROUPS, sliderKey, targetWeights } from './modifiers.js';
 import { buildUI } from './ui.js';
+import { registerHair, buildHair } from './hair.js';
 import { exportGLB, download } from './export.js';
 
 const STORE_KEY = 'avatar-studio-state-v1';
@@ -58,6 +59,7 @@ export function mergeState(def, s) {
 }
 
 const D = await loadCore();
+registerHair(D); D.buildGenerated = (id) => buildHair(D, id);
 const state = loadState();
 const skin = new SkinCompositor(renderer, D);
 const avatar = new Avatar(D, state, skin.texture, renderer);
@@ -69,7 +71,7 @@ const app = {
   panelWidth: 0, placing: null, listeners: new Set(),
   // ---- change notifications from the UI
   shapeChanged() { avatar.dirty.shape = true; app.save(); },
-  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top), hipsCovered: !!(state.parts.full || state.parts.bottom) }); app.save(); },
+  skinChanged() { skin.apply(state.skin, { hairColor: state.colors.hair || '#3a2a1f', gender: state.macro.gender, chestCovered: !!(state.parts.full || state.parts.top), hipsCovered: !!(state.parts.full || state.parts.bottom), scalp: D.proxies[state.parts.hair]?.scalp || null }); app.save(); },
   colorsChanged() { avatar.applyColors(); app.skinChanged(); },
   async partsChanged() { await avatar.syncParts(); avatar.update(); animator.rebuild(); app.skinChanged(); },
   setAnim(id) { state.anim = id; animator.play(id); app.save(); },

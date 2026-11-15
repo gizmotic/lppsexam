@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { targetWeights } from './modifiers.js';
 import { CONFIG } from './config.js';
 import { spread, loadImage } from './data.js';
+import { hairTexture } from './hair.js';
 
 export const EXPRESSIONS = {
   blinkL: [['eye-left-closure', 1]],
@@ -250,6 +251,11 @@ export class Avatar {
     if (slot === 'eyes') {
       return new THREE.MeshPhysicalMaterial({ map: this.eyeTexture(this.state.eyes.color), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, transparent: true, alphaTest: 0.02, envMapIntensity: 0.55 });
     }
+    if (slot === 'hair' && meta.gen) {
+      // generated hair: solid sculpted geometry, strand pattern as tint and relief
+      const strands = hairTexture(meta.tex);
+      return new THREE.MeshStandardMaterial({ map: strands, bumpMap: strands, bumpScale: meta.tex === 'strand' ? 2.2 : 3.2, color: new THREE.Color(color || '#3a2a1f'), roughness: 0.6, envMapIntensity: 0.55, side: THREE.DoubleSide });
+    }
     if (slot === 'hair') {
       // opaque core; the soft strand tips are drawn by a second, blended pass (see _softHair)
       const strands = this.texture(meta.map, { gray: true, cleanEdge: CONFIG.hairCleanEdge });
@@ -445,7 +451,7 @@ export class Avatar {
         const air = 0.003 + 0.014 * Math.max(0, this.state.macro.weight - 0.5) + 0.006 * Math.max(0, this.state.macro.muscle - 0.5), A = gp.array, N = gn.array;
         for (let i = 0; i < A.length; i++) A[i] += N[i] * air;
       }
-      if (slot === 'hair') {
+      if (slot === 'hair' && !p.gen) {
         // hair is many overlapping cards: lean the normals toward a head-centred shell so it shades as one volume
         const hi = D.bones.findIndex((b) => b.name === 'head') * 3;
         const cx = rest[hi], cy = rest[hi + 1] + 0.07, cz = rest[hi + 2] - 0.01, N = gn.array, A = gp.array;
@@ -478,9 +484,11 @@ export class Avatar {
     const hair = this.parts.get('hair'), hat = this.parts.get('hat'), top = this.parts.get('top'), bottom = this.parts.get('bottom');
     if (hair) cullAbove(hair, hat ? lowest(hat) + 0.012 : null);
     if (bottom) {
-      const hip = rest[3 * D.bones.findIndex((b) => b.name === 'upperleg01.L') + 1];
-      const hem = top ? lowest(top) : Infinity;
-      cullAbove(bottom, hem < hip - 0.1 ? hem + 0.04 : null);
+      // the top's hem at the middle of the torso (sleeves excluded): whatever the trousers/skirt have above it lies under the top
+      // and would poke through it, so it is dropped. A crop top's hem is higher than the waistband, so nothing is dropped then.
+      let hem = Infinity;
+      if (top) { const a = top.mesh.geometry.attributes.position.array; for (let i = 0; i < a.length; i += 3) if (Math.abs(a[i]) < 0.16 && a[i + 1] < hem) hem = a[i + 1]; }
+      cullAbove(bottom, Number.isFinite(hem) ? hem + CONFIG.hemMargin : null);
     }
     this.root.position.y = -minY;
     this.height = maxY - minY;

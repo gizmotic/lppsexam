@@ -10,7 +10,7 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.log('[error]', m.text().slice(0, 300)); });
-await page.goto((process.env.URL || 'http://localhost:5199/') + '?fresh&bare');
+await page.goto((process.env.URL || 'http://localhost:5199/') + '?fresh&bare&skin=1024');
 await page.waitForFunction('window.__ready === true', null, { timeout: 90000 });
 await page.addStyleTag({ content: '#panel,#toolbar,#toast{display:none!important} #view{height:100%!important}' });
 await page.evaluate('__app.panelWidth = 0; __app.resize();');
@@ -19,7 +19,7 @@ for (const s of shots) {
   const r = await page.evaluate(`(async()=>{${s.js || ''}})()`);
   if (r !== undefined) console.log(s.name, JSON.stringify(r));
   await page.waitForTimeout(s.wait ?? 700);
-  tiles.push({ name: s.name, buf: await page.screenshot() });
+  tiles.push({ name: s.name, buf: await page.screenshot({ timeout: 180000 }) });
 }
 await browser.close();
 const C = +cols, R = Math.ceil(tiles.length / C);

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { loadImage } from './data.js';
+import { scalp } from './hair.js';
 
 export const MAX_MOLES = 24, MAX_TATTOOS = 8;
 export const TATTOO_GLYPHS = ['★', '♥', '☾', '⚓', '☀', '♪', '∞', '✿', '⚡', '☯', '♠', '✦', '❖', '➳', '☘', '♛'];
@@ -14,7 +15,8 @@ const VERT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = v
 const FRAG = /* glsl */`
 precision highp float;
 varying vec2 vUv;
-uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uAtlas, uPos;
+uniform sampler2D uSkinA, uSkinB, uMaskA, uMaskB, uMaskC, uAtlas, uPos;
+uniform vec3 uScalp;
 uniform float uHasPos, uWaist;
 uniform float uAgeMix, uFreckles, uBodyFreckles, uSeed, uLip, uBlush, uShadow, uBeard, uUnderTop, uUnderBottom;
 uniform vec3 uOldMul, uOldMulFace, uToneMul, uLipColor, uBlushColor, uShadowColor, uHairColor, uUnderColor;
@@ -69,16 +71,30 @@ void main(){
   float lip = smoothstep(0.30, 0.52, mA.r) * uLip;
   c = mix(c, uLipColor * (0.5 + 0.75 * lum(c)), lip * 0.9);
 
-  // freckles: face cluster + body
-  float fr = max(spots(vUv, 420.0, 0.75, uSeed), spots(vUv, 760.0, 0.6, uSeed + 5.0) * 0.8);
-  float frMask = clamp(mA.a * uFreckles * 1.6, 0.0, 1.0) + clamp(mB.a * uBodyFreckles, 0.0, 1.0);
-  float thin = smoothstep(1.0 - clamp(frMask, 0.0, 1.0), 1.0, vnoise(vUv * 90.0 + uSeed) * 0.6 + 0.5);
-  c = mix(c, c * vec3(0.70, 0.52, 0.42), fr * thin * min(frMask * 1.5, 0.85) * (1.0 - lip));
+  // freckles: face cluster + body (skipped entirely when off: the spot pattern is the costly part of this shader)
+  if (uFreckles + uBodyFreckles > 0.0) {
+    float fr = max(spots(vUv, 420.0, 0.75, uSeed), spots(vUv, 760.0, 0.6, uSeed + 5.0) * 0.8);
+    float frMask = clamp(mA.a * uFreckles * 1.6, 0.0, 1.0) + clamp(mB.a * uBodyFreckles, 0.0, 1.0);
+    float thin = smoothstep(1.0 - clamp(frMask, 0.0, 1.0), 1.0, vnoise(vUv * 90.0 + uSeed) * 0.6 + 0.5);
+    c = mix(c, c * vec3(0.70, 0.52, 0.42), fr * thin * min(frMask * 1.5, 0.85) * (1.0 - lip));
+  }
 
   // beard shadow + stubble
-  float bm = smoothstep(0.02, 0.95, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
-  float stub = max(spots(vUv, 3400.0, 0.9, 3.0), spots(vUv, 2300.0, 0.7, 9.0));
-  c = mix(c, c * (uHairColor * 0.6 + 0.12), bm * (0.22 + 0.78 * stub));
+  if (uBeard > 0.0) {
+    float bm = smoothstep(0.02, 0.95, mB.b) * uBeard * (1.0 - smoothstep(0.25, 0.5, mA.r));
+    float stub = max(spots(vUv, 3400.0, 0.9, 3.0), spots(vUv, 2300.0, 0.7, 9.0));
+    c = mix(c, c * (uHairColor * 0.6 + 0.12), bm * (0.22 + 0.78 * stub));
+  }
+
+  // scalp: short hair is painted (buzz cut, the faded sides of a cut); x = strength, y..z = elevation range of the fade
+  if (uScalp.x > 0.0) {
+    vec4 mC = texture2D(uMaskC, vUv);
+    float onScalp = smoothstep(0.0, 0.05, (mC.r - 0.5) * 2.0) * uScalp.x * smoothstep(uScalp.y, uScalp.z, mC.g * 150.0 - 60.0);
+    if (onScalp > 0.0) {
+      float fuzz = max(spots(vUv, 3600.0, 0.92, 5.0), spots(vUv, 2500.0, 0.8, 11.0));
+      c = mix(c, c * (uHairColor * 0.5 + 0.08), onScalp * (0.62 + 0.38 * fuzz));
+    }
+  }
 
   // moles
   for (int i = 0; i < ${MAX_MOLES}; i++) {
@@ -156,7 +172,7 @@ export class SkinCompositor {
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
       uniforms: {
-        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 }, uWaist: { value: 0.9 },
+        uSkinA: { value: null }, uSkinB: { value: null }, uMaskA: { value: this.maskA.texture }, uMaskB: { value: this.maskB.texture }, uMaskC: { value: this.maskC.texture }, uScalp: { value: new THREE.Vector3(0, -90, -89) }, uAtlas: { value: this.atlas }, uPos: { value: this.posMap ? this.posMap.texture : null }, uHasPos: { value: this.posMap ? 1 : 0 }, uWaist: { value: 0.9 },
         uAgeMix: { value: 0 }, uFreckles: { value: 0 }, uBodyFreckles: { value: 0 }, uSeed: { value: 1 }, uLip: { value: 0 }, uBlush: { value: 0 },
         uShadow: { value: 0 }, uBeard: { value: 0 }, uUnderTop: { value: 0 }, uUnderBottom: { value: 1 },
         uOldMul: { value: new THREE.Vector3(1, 1, 1) }, uOldMulFace: { value: new THREE.Vector3(1, 1, 1) }, uToneMul: { value: new THREE.Vector3(1, 1, 1) }, uLipColor: { value: new THREE.Color() }, uBlushColor: { value: new THREE.Color() },
@@ -236,6 +252,10 @@ export class SkinCompositor {
       return a;
     };
     this.maskA = bake(ca); this.maskB = bake(cb);
+    // scalp mask: r = distance above the hairline (0.5 = on it), g = elevation on the skull
+    const sc = scalp(D), cc = new Float32Array(B.nR * 4);
+    for (let q = 0; q < B.nR; q++) { const v = B.vmap[q]; cc[4 * q] = Math.min(1, Math.max(0, 0.5 + sc.s[v] * 0.5)); cc[4 * q + 1] = Math.min(1, Math.max(0, (sc.th[v] + 60) / 150)); cc[4 * q + 3] = 1; }
+    this.maskC = bake(cc, 0);
     if (floatOK) {
       const cp = new Float32Array(B.nR * 4);
       for (let q = 0; q < B.nR; q++) { const v = B.vmap[q] * 3; cp[4 * q] = P[v]; cp[4 * q + 1] = P[v + 1]; cp[4 * q + 2] = P[v + 2]; cp[4 * q + 3] = 1; }
@@ -300,7 +320,8 @@ export class SkinCompositor {
     u.uLip.value = s.lipStrength; u.uBlush.value = s.blush; u.uShadow.value = s.shadow; u.uBeard.value = s.beard;
     // School use: the painted base layer (undershirt + shorts) is part of the skin texture and always on.
     // It does not depend on which garments are worn or loaded, so the body is never shown unclothed.
-    u.uUnderBottom.value = 1; u.uUnderTop.value = 1;
+    u.uUnderBottom.value = CONFIG.paintedBase ? 1 : 0; u.uUnderTop.value = CONFIG.paintedBase ? 1 : 0;
+    if (ctx.scalp) u.uScalp.value.set(ctx.scalp.strength, ctx.scalp.lo, ctx.scalp.hi); else u.uScalp.value.set(0, -90, -89);
     const moles = CONFIG.moles ? s.moles.slice(0, MAX_MOLES) : [];
     moles.forEach((m, i) => u.uMoles.value[i].set(m.u, m.v, m.r, m.d));
     u.uMoleCount.value = moles.length;

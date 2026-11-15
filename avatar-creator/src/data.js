@@ -56,7 +56,7 @@ export async function loadCore() {
   };
   D.proxy = (id) => {
     let p = D._proxyCache.get(id);
-    if (!p) { p = loadProxy(D, id); D._proxyCache.set(id, p); }
+    if (!p) { p = D.proxies[id]?.gen ? Promise.resolve().then(() => D.buildGenerated(id)) : loadProxy(D, id); D._proxyCache.set(id, p); }
     return p;
   };
   return D;
@@ -77,6 +77,12 @@ async function loadProxy(D, id) {
     del: new Uint16Array(buf, m.del, m.nDel),
     scale: m.scale,
   };
+  return finishProxy(D, p);
+}
+
+// Adds what every proxy needs at runtime: fit scale statistics and skin weights (also used for generated hair).
+export function finishProxy(D, p) {
+  const m = { nP: p.nP, nR: p.nR }, id = p.id;
   // Mirror-packed items have no mhclo scale lines: follow the body with the spread (std-dev per axis)
   // of all referenced base verts instead, which a single outlying vertex cannot skew.
   if (id !== 'eyes') {

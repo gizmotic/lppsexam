@@ -83,8 +83,8 @@ test('face slider moves the nose through the panel UI', async ({ page }) => {
 test('hair, clothes and shoes can be changed from the panel', async ({ page }) => {
   await ready(page);
   await page.locator('.rail button[data-id=hair]').click();
-  await page.locator('.tile', { hasText: 'Pferdeschwanz' }).click();
-  await page.waitForFunction(() => __app.avatar.parts.get('hair')?.id === 'ponytail01');
+  await page.locator('.tile', { hasText: 'Hoher Pferdeschwanz' }).click();
+  await page.waitForFunction(() => __app.avatar.parts.get('hair')?.id === 'gen_high_pony');
   await page.locator('.rail button[data-id=clothes]').click();
   await page.locator('summary', { hasText: 'Kleider & Outfits' }).click();
   await page.locator('.tile', { hasText: 'Sommerkleid' }).click();
@@ -157,32 +157,51 @@ test('state survives a reload and the download stays under budget', async ({ pag
   expect(du('dist')).toBeLessThan(40e6);
 });
 
-test('school-safe: the base layer covers torso and hips on every figure, and clothes cannot be removed', async ({ page }) => {
+test('school-safe: clothes are mandatory and a change never shows a frame without them', async ({ page }) => {
   await ready(page);
-  // even when the state asks for no clothes at all, a top and a bottom are worn
+  // a state that asks for no clothes at all still gets a top and a bottom
   await page.evaluate(async () => { const s = __app.state; s.parts.top = null; s.parts.bottom = null; s.parts.full = null; await __app.partsChanged(); });
   expect(await page.evaluate(() => [__app.avatar.parts.has('top'), __app.avatar.parts.has('bottom')])).toEqual([true, true]);
+  // the UI offers no "none" for tops and bottoms
   await page.locator('.rail button[data-id=clothes]').click();
   await page.locator('summary', { hasText: 'Oberteile' }).click();
   await expect(page.locator('details[open] .tile.none')).toHaveCount(0);
-  // the painted layer: every skin texel on chest, belly, hips and upper thighs has the base-layer colour, for both sexes
-  for (const gender of [0, 1]) {
-    const res = await page.evaluate(async (gender) => {
-      const { D, skin, state } = __app;
-      state.macro.gender = gender; state.skin.underColor = '#2d6fb0'; __app.shapeChanged(); __app.skinChanged();
-      await new Promise((r) => setTimeout(r, 300)); skin.render();
-      const S = 1024, px = skin.toCanvas(S).getContext('2d').getImageData(0, 0, S, S).data;
-      let n = 0, bad = 0;
-      for (let r = 0; r < D.body.nR; r++) {
-        const v = D.body.vmap[r] * 3, x = Math.abs(D.pos[v]), y = D.pos[v + 1];
-        const torso = y > 1.1 && y < 5.0 && x < 1.3, hips = y > -1.2 && y < 1.1 && x < 2.2;
-        if (!torso && !hips) continue;
-        const u = Math.min(S - 1, Math.round(D.body.uv[2 * r] * S)), w = Math.min(S - 1, Math.round((1 - D.body.uv[2 * r + 1]) * S)), i = 4 * (w * S + u);
-        n++; if (!(px[i + 2] > px[i] + 40)) bad++;      // blue layer: blue well above red; skin is the other way round
-      }
-      return { n, bad };
-    }, gender);
-    expect(res.n).toBeGreaterThan(1000);
-    expect(res.bad / res.n).toBeLessThan(0.01);          // only texels right on a UV seam may differ
-  }
+  await page.locator('summary', { hasText: 'Hosen & Röcke' }).click();
+  await expect(page.locator('details[open] .tile.none')).toHaveCount(0);
+  // sample every animation frame while garments are swapped: the body must never be drawn without a top and a bottom (or a full outfit)
+  const bare = await page.evaluate(async () => {
+    const a = __app.avatar; let bare = 0, frames = 0, run = true;
+    const tick = () => { frames++; const dressed = a.parts.has('full') || (a.parts.has('top') && a.parts.has('bottom')); if (!dressed) bare++; if (run) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    const s = __app.state;
+    for (const change of [{ top: 'tubetop' }, { top: 'male_casualsuit05_top' }, { full: 'f_dress_02' }, { full: null, top: 'sleeveless', bottom: 'miniskirt' }, { bottom: 'tightjeans' }, { hair: 'gen_dreads' }, { top: 'coat' }]) {
+      Object.assign(s.parts, change); await __app.partsChanged();
+    }
+    await new Promise((r) => setTimeout(r, 200)); run = false;
+    return { bare, frames };
+  });
+  expect(bare.frames).toBeGreaterThan(5);
+  expect(bare.bare).toBe(0);
+  // the painted base layer is off, so no white patches can appear on the skin
+  expect(await page.evaluate(() => __app.skin.material.uniforms.uUnderTop.value + __app.skin.material.uniforms.uUnderBottom.value)).toBe(0);
+});
+
+test('every generated hairstyle builds and rides on the scalp', async ({ page }) => {
+  await ready(page);
+  const res = await page.evaluate(async () => {
+    const { D } = __app, out = [];
+    for (const [id, m] of Object.entries(D.proxies)) {
+      if (!m.gen) continue;
+      const p = await D.proxy(id); let bad = 0;
+      for (let i = 0; i < p.ref.length; i++) if (p.ref[i] >= D.core.nBody) bad++;      // hair must only reference body (scalp) vertices
+      for (let i = 0; i < p.off.length; i++) if (!Number.isFinite(p.off[i])) bad++;
+      out.push({ id, tris: p.idx.length / 3, verts: p.nP, bad });
+    }
+    return out;
+  });
+  expect(res.length).toBeGreaterThanOrEqual(25);
+  for (const r of res) { expect(r.bad, r.id).toBe(0); if (r.id !== 'gen_buzz') expect(r.tris, r.id).toBeGreaterThan(300); }
+  // the hair tab offers them
+  await page.locator('.rail button[data-id=hair]').click();
+  expect(await page.locator('.page:not([hidden]) .tile').count()).toBeGreaterThanOrEqual(26);
 });

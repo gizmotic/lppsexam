@@ -9,5 +9,5 @@ await page.goto(process.env.URL || 'http://localhost:5199/');
 await page.waitForFunction('window.__ready === true', null, { timeout: 60000 });
 if (js) { const r = await page.evaluate(`(async()=>{${js}})()`); if (r !== undefined) console.log(JSON.stringify(r)); }
 await page.waitForTimeout(+(process.env.WAIT || 800));
-await page.screenshot({ path: out });
+await page.screenshot({ path: out, timeout: 180000 });
 await browser.close();

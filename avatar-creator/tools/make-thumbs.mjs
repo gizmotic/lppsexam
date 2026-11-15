@@ -10,12 +10,16 @@ const FRAME = { hair: 'hair', hat: 'hair', glasses: 'face', top: 'upper', extra:
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 800, height: 1136 }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto((process.env.URL || 'http://localhost:5199/') + '?fresh');
+await page.goto((process.env.URL || 'http://localhost:5199/') + '?fresh&skin=512');
 await page.waitForFunction('window.__ready === true', null, { timeout: 90000 });
 await page.addStyleTag({ content: '#panel,#toolbar,#toast{display:none!important} #app{background:#bfb8ae!important}' });
 await page.evaluate('__app.panelWidth = 0; __app.resize(); __app.scene.children.filter(o => o.isMesh && o.material.isShadowMaterial).forEach(o => o.visible = false);');
 const items = await page.evaluate((slots) => Object.entries(__app.D.proxies).filter(([, p]) => slots.includes(p.slot)).map(([id, p]) => ({ id, slot: p.slot, tags: p.tags })), Object.keys(FRAME));
+// --missing: only items without a thumbnail yet;  --only=<prefix>: only ids starting with the prefix
+const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7), missing = process.argv.includes('--missing');
 for (const it of items) {
+  if (only && !it.id.startsWith(only)) continue;
+  if (missing && fs.existsSync(path.join(OUT, it.id + '.webp'))) continue;
   const female = /^(female|f_)/.test(it.id) || it.tags.includes('female');
   const gender = it.id.startsWith('male') ? 1 : female ? 0 : 0.35;
   await page.evaluate(async ({ it, gender, frame }) => {
