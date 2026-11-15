@@ -1,0 +1,367 @@
+// The avatar: CPU-morphed base mesh, fitted proxies (hair, clothes, eyes...), one shared skeleton.
+import * as THREE from 'three';
+import { targetWeights } from './modifiers.js';
+import { CONFIG } from './config.js';
+import { url } from './data.js';
+
+export const EXPRESSIONS = {
+  blinkL: [['eye-left-closure', 1]],
+  blinkR: [['eye-right-closure', 1]],
+  smile: [['mouth-corner-puller', 1], ['mouth-elevation', 0.25]],
+  mouthOpen: [['mouth-open', 1]],
+  browUp: [['eyebrows-left-up', 1], ['eyebrows-right-up', 1]],
+  browDown: [['eyebrows-left-down', 1], ['eyebrows-right-down', 1]],
+};
+const EXPR_NAMES = Object.keys(EXPRESSIONS);
+const FACE_SLOTS = new Set(['brows', 'lashes', 'teeth', 'tongue']);
+const HIDE_SLOTS = new Set(['top', 'bottom', 'full', 'shoes', 'extra']);
+const FIXED = { eyes: 'eyes', teeth: 'teeth_base', tongue: 'tongue01' };
+
+export const boneName = (n) => n.replace(/\./g, '_');
+
+function computeNormals(P, nP, idx, vmap, out, tmp) {
+  // P: positions per logical vert, idx: render-vert triangles, vmap: render -> logical
+  tmp.fill(0, 0, nP * 3);
+  for (let i = 0; i < idx.length; i += 3) {
+    const a = vmap[idx[i]] * 3, b = vmap[idx[i + 1]] * 3, c = vmap[idx[i + 2]] * 3;
+    const e1x = P[b] - P[a], e1y = P[b + 1] - P[a + 1], e1z = P[b + 2] - P[a + 2];
+    const e2x = P[c] - P[a], e2y = P[c + 1] - P[a + 1], e2z = P[c + 2] - P[a + 2];
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    tmp[a] += nx; tmp[a + 1] += ny; tmp[a + 2] += nz;
+    tmp[b] += nx; tmp[b + 1] += ny; tmp[b + 2] += nz;
+    tmp[c] += nx; tmp[c + 1] += ny; tmp[c + 2] += nz;
+  }
+  for (let r = 0; r < vmap.length; r++) {
+    const v = vmap[r] * 3;
+    const l = Math.hypot(tmp[v], tmp[v + 1], tmp[v + 2]) || 1;
+    out[3 * r] = tmp[v] / l; out[3 * r + 1] = tmp[v + 1] / l; out[3 * r + 2] = tmp[v + 2] / l;
+  }
+}
+
+export class Avatar {
+  constructor(D, state, skinTexture, renderer) {
+    this.D = D; this.state = state; this.renderer = renderer;
+    this.root = new THREE.Group(); this.root.name = 'Avatar';
+    this.V = new Float32Array(D.nV * 3);
+    this.dirty = { shape: true };
+    this.parts = new Map();          // slot -> { id, mesh, proxy, P }
+    this.texCache = new Map();
+    this.onRebuilt = null;
+    this._partsVersion = 0;
+    this._tmp = new Float32Array(D.nV * 3);
+    this.maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+    // --- skeleton
+    const nb = D.bones.length;
+    this.bones = D.bones.map((b) => { const o = new THREE.Bone(); o.name = boneName(b.name); return o; });
+    D.bones.forEach((b, i) => { if (b.parent >= 0) this.bones[b.parent].add(this.bones[i]); });
+    this.boneByName = new Map(this.bones.map((b) => [b.name, b]));
+    this.rest = new Float32Array(nb * 3);   // head positions, metres
+    this.tails = new Float32Array(nb * 3);
+    this.skeleton = new THREE.Skeleton(this.bones, this.bones.map(() => new THREE.Matrix4()));
+    this.motion = new THREE.Group(); this.motion.name = 'Motion';
+    this.root.add(this.motion); this.motion.add(this.bones[0]);
+
+    // --- expression deltas (dense, MH units) — independent of the body shape
+    this.expr = {};
+    if (CONFIG.expressions) for (const name of EXPR_NAMES) {
+      const d = new Float32Array(D.nV * 3);
+      for (const [t, w] of EXPRESSIONS[name]) {
+        const tg = D.target('expression/units/caucasian/' + t);
+        if (!tg) { console.warn('missing expression target', t); continue; }
+        const s = tg.s * w;
+        for (let k = 0; k < tg.n; k++) { const v = tg._i[k] * 3; d[v] += tg._d[3 * k] * s; d[v + 1] += tg._d[3 * k + 1] * s; d[v + 2] += tg._d[3 * k + 2] * s; }
+      }
+      this.expr[name] = d;
+    }
+
+    // --- body
+    const B = D.body;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(B.nR * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(B.nR * 3), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(B.uv, 2));
+    const si = new Uint16Array(B.nR * 4), sw = new Float32Array(B.nR * 4);
+    for (let r = 0; r < B.nR; r++) for (let k = 0; k < 4; k++) { si[4 * r + k] = D.skinIdx[4 * B.vmap[r] + k]; sw[4 * r + k] = D.skinW[4 * B.vmap[r] + k]; }
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(B.idx), 1));
+    this._addExprMorphs(g, B.vmap, B.nR, (name) => this.expr[name]);
+    this.skinMaterial = new THREE.MeshPhysicalMaterial({
+      map: skinTexture, roughness: 0.52, metalness: 0, specularIntensity: 0.45,
+      sheen: 0.35, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.9, 0.42, 0.32),
+    });
+    this.body = this._skinned(g, this.skinMaterial, 'Body');
+    this.root.add(this.body);
+  }
+
+  _skinned(geometry, material, name) {
+    const m = new THREE.SkinnedMesh(geometry, material);
+    m.name = name; m.bind(this.skeleton, new THREE.Matrix4());
+    m.frustumCulled = false; m.castShadow = CONFIG.shadows; m.receiveShadow = CONFIG.shadows;
+    if (geometry.morphAttributes.position) m.updateMorphTargets();
+    return m;
+  }
+
+  _addExprMorphs(geometry, vmap, nR, denseOf) {
+    if (!CONFIG.expressions) return;
+    const u = this.D.unit;
+    geometry.morphAttributes.position = EXPR_NAMES.map((name) => {
+      const d = denseOf(name); const a = new Float32Array(nR * 3);
+      for (let r = 0; r < nR; r++) { const v = vmap[r] * 3; a[3 * r] = d[v] * u; a[3 * r + 1] = d[v + 1] * u; a[3 * r + 2] = d[v + 2] * u; }
+      const attr = new THREE.BufferAttribute(a, 3); attr.name = name; return attr;
+    });
+    geometry.morphTargetsRelative = true;
+    geometry.userData.targetNames = EXPR_NAMES;
+  }
+
+  setExpression(name, v) {
+    const i = EXPR_NAMES.indexOf(name); if (i < 0) return;
+    for (const m of this.morphMeshes()) m.morphTargetInfluences[i] = v;
+  }
+  morphMeshes() {
+    const out = [];
+    if (this.body.morphTargetInfluences) out.push(this.body);
+    for (const p of this.parts.values()) if (p.mesh.morphTargetInfluences) out.push(p.mesh);
+    return out;
+  }
+
+  // ------------------------------------------------------------ textures
+  texture(file, { gray = false, srgb = true } = {}) {
+    const key = file + (gray ? '|g' : '');
+    let t = this.texCache.get(key);
+    if (t) return t;
+    if (!gray) {
+      t = new THREE.TextureLoader().load(url(file));
+    } else {
+      // luminance-normalised copy so material.color can tint it (survives GLB export as baseColorFactor)
+      const canvas = document.createElement('canvas');
+      t = new THREE.Texture();
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width; canvas.height = img.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        const id = ctx.getImageData(0, 0, img.width, img.height); const d = id.data;
+        let sum = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 40) { sum += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; n++; }
+        const k = n ? 165 / (sum / n) : 1;
+        for (let i = 0; i < d.length; i += 4) { const l = Math.min(255, (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) * k); d[i] = d[i + 1] = d[i + 2] = l; }
+        ctx.putImageData(id, 0, 0); t.image = canvas; t.needsUpdate = true;
+      };
+      img.src = url(file);
+    }
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.anisotropy = Math.min(8, this.maxAniso);
+    this.texCache.set(key, t);
+    return t;
+  }
+
+  // iris recoloured from the one base texture: saturated pixels are iris, their value carries the fibre detail
+  eyeTexture(hex) {
+    const key = 'eye|' + hex;
+    let t = this.texCache.get(key);
+    if (t) return t;
+    t = new THREE.Texture(); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, this.maxAniso);
+    this.texCache.set(key, t);
+    const paint = (img) => {
+      const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+      const id = ctx.getImageData(0, 0, img.width, img.height), d = id.data;
+      const c = new THREE.Color(hex).convertLinearToSRGB(); const cr = c.r * 255, cg = c.g * 255, cb = c.b * 255;
+      for (let i = 0; i < d.length; i += 4) {
+        const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+        if (mx < 8) continue;
+        const sat = (mx - mn) / mx; let k = (sat - 0.3) / 0.25; if (k <= 0) continue; if (k > 1) k = 1;
+        const l = Math.min(1.25, (mx / 255) * 1.75);
+        d[i] += (Math.min(255, cr * l) - d[i]) * k; d[i + 1] += (Math.min(255, cg * l) - d[i + 1]) * k; d[i + 2] += (Math.min(255, cb * l) - d[i + 2]) * k;
+      }
+      ctx.putImageData(id, 0, 0); t.image = canvas; t.needsUpdate = true;
+    };
+    if (!this._eyeImg) {
+      this._eyeImg = new Promise((res) => { const img = new Image(); img.onload = () => res(img); img.src = url('tex/eye_base.webp'); });
+    }
+    this._eyeImg.then(paint);
+    return t;
+  }
+
+  _material(slot, meta) {
+    const color = this.state.colors[slot];
+    if (slot === 'eyes') {
+      return new THREE.MeshPhysicalMaterial({ map: this.eyeTexture(this.state.eyes.color), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, transparent: true, alphaTest: 0.02 });
+    }
+    if (slot === 'hair') {
+      return new THREE.MeshStandardMaterial({ map: this.texture(meta.map, { gray: true }), color: new THREE.Color(color || '#3a2a1f'), roughness: 0.55, alphaTest: 0.32, alphaToCoverage: true, side: THREE.DoubleSide });
+    }
+    if (slot === 'brows' || slot === 'lashes') {
+      return new THREE.MeshStandardMaterial({
+        map: this.texture(meta.map, { gray: slot === 'brows' }), color: new THREE.Color(slot === 'brows' ? (color || '#2e2119') : '#16110e'),
+        roughness: 0.7, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      });
+    }
+    if (slot === 'teeth' || slot === 'tongue') return new THREE.MeshStandardMaterial({ map: this.texture(meta.map), roughness: 0.35 });
+    const m = new THREE.MeshStandardMaterial({
+      map: this.texture(meta.map, { gray: !!color }), color: new THREE.Color(color || '#ffffff'),
+      roughness: slot === 'shoes' ? 0.6 : 0.85, side: THREE.DoubleSide, alphaTest: 0.5,
+    });
+    if (meta.normal) { m.normalMap = this.texture(meta.normal, { srgb: false }); m.normalScale.set(0.8, 0.8); }
+    if (slot === 'glasses') { m.alphaTest = 0; m.transparent = true; m.roughness = 0.2; }
+    return m;
+  }
+
+  applyColors() {
+    for (const [slot, p] of this.parts) {
+      const old = p.mesh.material;
+      p.mesh.material = this._material(slot, p.proxy.meta);
+      old.dispose();
+    }
+  }
+
+  // ------------------------------------------------------------ parts
+  wanted() {
+    const s = this.state.parts; const w = { ...FIXED };
+    for (const slot of ['hair', 'brows', 'lashes', 'shoes', 'hat', 'glasses', 'extra']) if (s[slot]) w[slot] = s[slot];
+    if (s.full) w.full = s.full; else { if (s.top) w.top = s.top; if (s.bottom) w.bottom = s.bottom; }
+    return w;
+  }
+
+  async syncParts() {
+    const version = ++this._partsVersion;
+    const want = this.wanted();
+    const loaded = await Promise.all(Object.entries(want).map(async ([slot, id]) => [slot, id, await this.D.proxy(id)]));
+    if (version !== this._partsVersion) return;
+    for (const [slot, p] of [...this.parts]) {
+      if (want[slot] !== p.id) { this.root.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); this.parts.delete(slot); }
+    }
+    for (const [slot, id, proxy] of loaded) {
+      if (this.parts.has(slot)) continue;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(proxy.nR * 3), 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(proxy.nR * 3), 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(proxy.uv, 2));
+      g.setAttribute('skinIndex', new THREE.BufferAttribute(proxy.skinIdx, 4));
+      g.setAttribute('skinWeight', new THREE.BufferAttribute(proxy.skinW, 4));
+      g.setIndex(new THREE.BufferAttribute(proxy.idx, 1));
+      if (FACE_SLOTS.has(slot)) {
+        if (!proxy.exprDense) {
+          proxy.exprDense = {};
+          for (const name of EXPR_NAMES) {
+            const src = this.expr[name]; if (!src) continue;
+            const d = new Float32Array(proxy.nP * 3);
+            for (let i = 0; i < proxy.nP; i++) for (let k = 0; k < 3; k++) {
+              const v = proxy.ref[3 * i + k] * 3, b = proxy.bary[3 * i + k];
+              d[3 * i] += src[v] * b; d[3 * i + 1] += src[v + 1] * b; d[3 * i + 2] += src[v + 2] * b;
+            }
+            proxy.exprDense[name] = d;
+          }
+        }
+        this._addExprMorphs(g, proxy.vmap, proxy.nR, (name) => proxy.exprDense[name]);
+      }
+      const mesh = this._skinned(g, this._material(slot, proxy.meta), 'Part_' + slot);
+      if (slot === 'brows' || slot === 'lashes') { mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = 2; }
+      if (slot === 'glasses') mesh.renderOrder = 3;
+      if (mesh.morphTargetInfluences && this.body.morphTargetInfluences) this.body.morphTargetInfluences.forEach((v, i) => { mesh.morphTargetInfluences[i] = v; });
+      this.root.add(mesh);
+      this.parts.set(slot, { id, mesh, proxy, P: new Float32Array(proxy.nP * 3) });
+    }
+    this._updateBodyMask();
+    this.dirty.shape = true;
+  }
+
+  _updateBodyMask() {
+    const D = this.D; const hide = new Uint8Array(D.nV); let any = false;
+    for (const [slot, p] of this.parts) if (HIDE_SLOTS.has(slot)) { for (const v of p.proxy.del) hide[v] = 1; any = any || p.proxy.del.length > 0; }
+    const src = D.body.idx, vm = D.body.vmap; const out = new Uint32Array(src.length); let n = 0;
+    for (let i = 0; i < src.length; i += 3) {
+      if (any && hide[vm[src[i]]] && hide[vm[src[i + 1]]] && hide[vm[src[i + 2]]]) continue;
+      out[n++] = src[i]; out[n++] = src[i + 1]; out[n++] = src[i + 2];
+    }
+    this.body.geometry.setIndex(new THREE.BufferAttribute(out.subarray(0, n), 1));
+  }
+
+  // ------------------------------------------------------------ shape
+  rebuild() {
+    const D = this.D, V = this.V, u = D.unit;
+    V.set(D.pos);
+    this.missing = this.missing || new Set();
+    for (const [name, w] of targetWeights(this.state)) {
+      const t = D.target(name);
+      if (!t) { if (!this.missing.has(name)) { this.missing.add(name); console.warn('missing target', name); } continue; }
+      const s = t.s * w, I = t._i, Dd = t._d;
+      for (let k = 0; k < t.n; k++) { const v = I[k] * 3; V[v] += Dd[3 * k] * s; V[v + 1] += Dd[3 * k + 1] * s; V[v + 2] += Dd[3 * k + 2] * s; }
+    }
+    // body
+    const B = D.body, pa = this.body.geometry.attributes.position, na = this.body.geometry.attributes.normal;
+    let minY = Infinity, maxY = -Infinity;
+    for (let r = 0; r < B.nR; r++) {
+      const v = B.vmap[r] * 3; const y = V[v + 1] * u;
+      pa.array[3 * r] = V[v] * u; pa.array[3 * r + 1] = y; pa.array[3 * r + 2] = V[v + 2] * u;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    computeNormals(V, D.nV, B.idx, B.vmap, na.array, this._tmp);
+    pa.needsUpdate = true; na.needsUpdate = true;
+    // skeleton
+    const nb = D.bones.length, rest = this.rest;
+    const mean = (list, out, o) => {
+      let x = 0, y = 0, z = 0;
+      for (const v of list) { x += V[3 * v]; y += V[3 * v + 1]; z += V[3 * v + 2]; }
+      const k = u / list.length; out[o] = x * k; out[o + 1] = y * k; out[o + 2] = z * k;
+    };
+    for (let i = 0; i < nb; i++) { mean(D.bones[i].head, rest, 3 * i); mean(D.bones[i].tail, this.tails, 3 * i); }
+    for (let i = 0; i < nb; i++) {
+      const p = D.bones[i].parent, b = this.bones[i];
+      if (p < 0) b.position.set(rest[0], rest[1], rest[2]);
+      else b.position.set(rest[3 * i] - rest[3 * p], rest[3 * i + 1] - rest[3 * p + 1], rest[3 * i + 2] - rest[3 * p + 2]);
+      this.skeleton.boneInverses[i].makeTranslation(-rest[3 * i], -rest[3 * i + 1], -rest[3 * i + 2]);
+    }
+    // proxies
+    for (const [slot, part] of this.parts) {
+      const p = part.proxy, P = part.P;
+      const sc = p.scale.map(([a, b, den], ax) => Math.abs(V[3 * b + ax] - V[3 * a + ax]) / den);
+      for (let i = 0; i < p.nP; i++) {
+        const a = p.ref[3 * i] * 3, b = p.ref[3 * i + 1] * 3, c = p.ref[3 * i + 2] * 3;
+        const wa = p.bary[3 * i], wb = p.bary[3 * i + 1], wc = p.bary[3 * i + 2];
+        P[3 * i] = wa * V[a] + wb * V[b] + wc * V[c] + p.off[3 * i] * sc[0];
+        P[3 * i + 1] = wa * V[a + 1] + wb * V[b + 1] + wc * V[c + 1] + p.off[3 * i + 1] * sc[1];
+        P[3 * i + 2] = wa * V[a + 2] + wb * V[b + 2] + wc * V[c + 2] + p.off[3 * i + 2] * sc[2];
+      }
+      const gp = part.mesh.geometry.attributes.position, gn = part.mesh.geometry.attributes.normal;
+      for (let r = 0; r < p.nR; r++) {
+        const v = p.vmap[r] * 3; const y = P[v + 1] * u;
+        gp.array[3 * r] = P[v] * u; gp.array[3 * r + 1] = y; gp.array[3 * r + 2] = P[v + 2] * u;
+        if (slot === 'shoes' && y < minY) minY = y;
+        if ((slot === 'hair' || slot === 'hat') && y > maxY) maxY = y;
+      }
+      computeNormals(P, p.nP, p.idx, p.vmap, gn.array, this._tmp);
+      if (slot === 'hair') {
+        // hair is many overlapping cards: lean the normals toward a head-centred shell so it shades as one volume
+        const hi = D.bones.findIndex((b) => b.name === 'head') * 3;
+        const cx = rest[hi], cy = rest[hi + 1] + 0.07, cz = rest[hi + 2] - 0.01, N = gn.array, A = gp.array;
+        for (let r = 0; r < p.nR; r++) {
+          let dx = A[3 * r] - cx, dy = Math.max(0, A[3 * r + 1] - cy), dz = A[3 * r + 2] - cz;
+          const l = Math.hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
+          let nx = N[3 * r], ny = N[3 * r + 1], nz = N[3 * r + 2];
+          if (nx * dx + ny * dy + nz * dz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+          nx = nx * 0.3 + dx * 0.7; ny = ny * 0.3 + dy * 0.7; nz = nz * 0.3 + dz * 0.7;
+          const k = Math.hypot(nx, ny, nz) || 1; N[3 * r] = nx / k; N[3 * r + 1] = ny / k; N[3 * r + 2] = nz / k;
+        }
+      }
+      gp.needsUpdate = true; gn.needsUpdate = true;
+    }
+    this.root.position.y = -minY;
+    this.height = maxY - minY;
+    this.bodyHeight = (() => { let m = -Infinity; for (let v = 0; v < D.core.nBody; v++) if (V[3 * v + 1] > m) m = V[3 * v + 1]; return m * u - minY; })();
+    this.dirty.shape = false;
+    if (this.onRebuilt) this.onRebuilt();
+  }
+
+  // world-space anchor points for camera framing
+  anchor(name) {
+    const i = this.D.bones.findIndex((b) => b.name === name);
+    return new THREE.Vector3(this.rest[3 * i], this.rest[3 * i + 1] + this.root.position.y, this.rest[3 * i + 2]);
+  }
+
+  update() {
+    if (this.dirty.shape) this.rebuild();
+  }
+}
